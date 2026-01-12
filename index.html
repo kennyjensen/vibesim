@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vibesim</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-title">Vibesim</div>
+      <div class="version">v0.1.239</div>
+    </div>
+    <div class="controls">
+      <label class="runtime">Runtime (s)
+        <input id="runtimeInput" type="number" value="10" step="0.5" min="0.1">
+      </label>
+      <button id="runBtn">Run</button>
+      <button id="clearBtn">Clear</button>
+      <span id="status" class="status">Idle</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="toolbox">
+      <h2>Toolbox</h2>
+      <details class="tool-group" open>
+        <summary>Source</summary>
+        <button class="tool" data-type="constant">Constant</button>
+        <button class="tool" data-type="step">Step</button>
+        <button class="tool" data-type="ramp">Ramp</button>
+        <button class="tool" data-type="impulse">Impulse</button>
+        <button class="tool" data-type="sine">Sine</button>
+        <button class="tool" data-type="chirp">Chirp</button>
+        <button class="tool" data-type="noise">Noise</button>
+        <button class="tool" data-type="fileSource">File</button>
+      </details>
+      <details class="tool-group" open>
+        <summary>Continuous</summary>
+        <button class="tool" data-type="integrator">Integrator</button>
+        <button class="tool" data-type="tf">Transfer Function</button>
+        <button class="tool" data-type="lpf">LPF</button>
+        <button class="tool" data-type="hpf">HPF</button>
+        <button class="tool" data-type="derivative">Derivative</button>
+        <button class="tool" data-type="pid">PID</button>
+      </details>
+      <details class="tool-group" open>
+        <summary>Math</summary>
+        <button class="tool" data-type="gain">Gain</button>
+        <button class="tool" data-type="sum">Addition</button>
+        <button class="tool" data-type="mult">Multiplication</button>
+      </details>
+      <details class="tool-group" open>
+        <summary>Discrete</summary>
+        <button class="tool" data-type="zoh">ZOH</button>
+        <button class="tool" data-type="foh">FOH</button>
+        <button class="tool" data-type="dtf">Discrete TF</button>
+      </details>
+      <details class="tool-group" open>
+        <summary>Nonlinear</summary>
+        <button class="tool" data-type="saturation">Saturation</button>
+        <button class="tool" data-type="rate">Rate Limit</button>
+        <button class="tool" data-type="backlash">Backlash</button>
+      </details>
+      <details class="tool-group" open>
+        <summary>Sink</summary>
+        <button class="tool" data-type="scope">Scope</button>
+        <button class="tool" data-type="fileSink">Output File</button>
+      </details>
+      <div id="inspector" class="inspector">
+        <h3>Properties</h3>
+        <div id="inspectorBody" class="inspector-body">Select a block or wire.</div>
+        <button id="rotateSelection" class="secondary">Rotate</button>
+        <button id="deleteSelection" class="danger">Delete</button>
+      </div>
+      <div id="debugPanel" class="debug-panel">
+        <h3>Debug</h3>
+        <pre id="debugLog">Routing debug output will appear here.</pre>
+      </div>
+    </aside>
+
+    <section class="workspace">
+      <div id="canvas">
+        <button id="fullRouteBtn" class="floating-btn" aria-label="Full reroute">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6v4h4M18 18v-4h-4M7 17a7 7 0 0 0 10 0M17 7a7 7 0 0 0-10 0" />
+          </svg>
+        </button>
+        <svg id="svgCanvas">
+          <g id="blockLayer"></g>
+          <g id="wireLayer"></g>
+          <g id="overlayLayer"></g>
+        </svg>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
