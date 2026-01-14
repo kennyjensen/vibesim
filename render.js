@@ -24,6 +24,7 @@ function renderSvgMath(group, mathMl, width, height) {
     y: 0,
     width,
     height,
+    class: "upright",
   });
   const div = document.createElement("div");
   div.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
@@ -35,13 +36,17 @@ function renderSvgMath(group, mathMl, width, height) {
 
 let mathJaxQueued = false;
 let mathJaxRetryScheduled = false;
+let mathJaxFlushScheduled = false;
+const mathJaxQueue = new Set();
 function queueMathJaxTypeset() {
-  if (mathJaxQueued) return;
-  mathJaxQueued = true;
+  if (mathJaxFlushScheduled) return;
+  mathJaxFlushScheduled = true;
   requestAnimationFrame(() => {
-    mathJaxQueued = false;
+    mathJaxFlushScheduled = false;
     if (window.MathJax && typeof window.MathJax.typesetPromise === "function") {
-      window.MathJax.typesetPromise();
+      const targets = Array.from(mathJaxQueue);
+      mathJaxQueue.clear();
+      window.MathJax.typesetPromise(targets);
       mathJaxRetryScheduled = false;
     } else if (!mathJaxRetryScheduled) {
       mathJaxRetryScheduled = true;
@@ -56,11 +61,13 @@ function queueMathJaxTypeset() {
 function renderTeXMath(group, tex, width, height) {
   if (!group) return;
   group.innerHTML = "";
+  mathJaxQueue.add(group);
   const foreign = createSvgElement("foreignObject", {
     x: 0,
     y: 0,
     width,
     height,
+    class: "upright",
   });
   const div = document.createElement("div");
   div.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
@@ -79,7 +86,191 @@ function svgRect(x, y, w, h, cls) {
 }
 
 function svgText(x, y, text) {
-  return createSvgElement("text", { x, y, class: "block-text" }, text);
+  return createSvgElement("text", { x, y, class: "block-text upright" }, text);
+}
+
+function renderSourcePlot(group, width, height, plotPath) {
+  group.appendChild(svgRect(0, 0, width, height, "block-body"));
+  const axisX = 14;
+  const axisY = height - 16;
+  const axisTop = 14;
+  const axisRight = width - 14;
+  group.appendChild(
+    createSvgElement("line", {
+      x1: axisX,
+      y1: axisY,
+      x2: axisRight,
+      y2: axisY,
+      class: "source-axis",
+      stroke: "#3c3c3c",
+      "stroke-width": 2,
+      fill: "none",
+    })
+  );
+  group.appendChild(
+    createSvgElement("line", {
+      x1: axisRight,
+      y1: axisY,
+      x2: axisRight - 6,
+      y2: axisY - 3,
+      class: "source-axis",
+      stroke: "#3c3c3c",
+      "stroke-width": 2,
+      fill: "none",
+    })
+  );
+  group.appendChild(
+    createSvgElement("line", {
+      x1: axisRight,
+      y1: axisY,
+      x2: axisRight - 6,
+      y2: axisY + 3,
+      class: "source-axis",
+      stroke: "#3c3c3c",
+      "stroke-width": 2,
+      fill: "none",
+    })
+  );
+  group.appendChild(
+    createSvgElement("line", {
+      x1: axisX,
+      y1: axisY,
+      x2: axisX,
+      y2: axisTop,
+      class: "source-axis",
+      stroke: "#3c3c3c",
+      "stroke-width": 2,
+      fill: "none",
+    })
+  );
+  group.appendChild(
+    createSvgElement("line", {
+      x1: axisX,
+      y1: axisTop,
+      x2: axisX - 3,
+      y2: axisTop + 6,
+      class: "source-axis",
+      stroke: "#3c3c3c",
+      "stroke-width": 2,
+      fill: "none",
+    })
+  );
+  group.appendChild(
+    createSvgElement("line", {
+      x1: axisX,
+      y1: axisTop,
+      x2: axisX + 3,
+      y2: axisTop + 6,
+      class: "source-axis",
+      stroke: "#3c3c3c",
+      "stroke-width": 2,
+      fill: "none",
+    })
+  );
+  group.appendChild(
+    createSvgElement("path", {
+      d: plotPath,
+      class: "source-plot",
+      stroke: "#3c3c3c",
+      "stroke-width": 2,
+      fill: "none",
+    })
+  );
+}
+
+function renderCenteredAxesPlot(group, width, height, plotPath) {
+  group.appendChild(svgRect(0, 0, width, height, "block-body"));
+  const axisLeft = 14;
+  const axisRight = width - 14;
+  const axisTop = 14;
+  const axisBottom = height - 14;
+  const midX = (axisLeft + axisRight) / 2;
+  const midY = (axisTop + axisBottom) / 2;
+  group.appendChild(
+    createSvgElement("line", {
+      x1: axisLeft,
+      y1: midY,
+      x2: axisRight,
+      y2: midY,
+      class: "source-axis",
+      stroke: "#3c3c3c",
+      "stroke-width": 2,
+      fill: "none",
+    })
+  );
+  group.appendChild(
+    createSvgElement("line", {
+      x1: axisRight,
+      y1: midY,
+      x2: axisRight - 6,
+      y2: midY - 3,
+      class: "source-axis",
+      stroke: "#3c3c3c",
+      "stroke-width": 2,
+      fill: "none",
+    })
+  );
+  group.appendChild(
+    createSvgElement("line", {
+      x1: axisRight,
+      y1: midY,
+      x2: axisRight - 6,
+      y2: midY + 3,
+      class: "source-axis",
+      stroke: "#3c3c3c",
+      "stroke-width": 2,
+      fill: "none",
+    })
+  );
+  group.appendChild(
+    createSvgElement("line", {
+      x1: midX,
+      y1: axisBottom,
+      x2: midX,
+      y2: axisTop,
+      class: "source-axis",
+      stroke: "#3c3c3c",
+      "stroke-width": 2,
+      fill: "none",
+    })
+  );
+  group.appendChild(
+    createSvgElement("line", {
+      x1: midX,
+      y1: axisTop,
+      x2: midX - 3,
+      y2: axisTop + 6,
+      class: "source-axis",
+      stroke: "#3c3c3c",
+      "stroke-width": 2,
+      fill: "none",
+    })
+  );
+  group.appendChild(
+    createSvgElement("line", {
+      x1: midX,
+      y1: axisTop,
+      x2: midX + 3,
+      y2: axisTop + 6,
+      class: "source-axis",
+      stroke: "#3c3c3c",
+      "stroke-width": 2,
+      fill: "none",
+    })
+  );
+  if (!plotPath) return;
+  const paths = Array.isArray(plotPath) ? plotPath : [plotPath];
+  paths.forEach((d) => {
+    group.appendChild(
+      createSvgElement("path", {
+        d,
+        class: "source-plot",
+        stroke: "#3c3c3c",
+        "stroke-width": 2,
+        fill: "none",
+      })
+    );
+  });
 }
 
 export function buildFallbackPath(fromPos, toPos) {
@@ -232,12 +423,31 @@ function renderRectBlock(block, title, lines = [], iconType = null) {
   });
 }
 
-function drawIcon(type, x, y) {
-  const g = createSvgElement("g", { class: "block-icon", transform: `translate(${x}, ${y})` });
-  const size = 22;
+function drawIcon(type, x, y, sizeOverride = null) {
+  const g = createSvgElement("g", { class: "block-icon upright", transform: `translate(${x}, ${y})` });
+  const size = sizeOverride ?? 22;
   const mid = size / 2;
   const addText = (text) => {
     g.appendChild(createSvgElement("text", { x: mid, y: mid }, text));
+  };
+  const addMath = (tex) => {
+    const foreign = createSvgElement("foreignObject", {
+      x: 0,
+      y: 0,
+      width: size,
+      height: size,
+      class: "upright",
+    });
+    const div = document.createElement("div");
+    div.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+    div.className = "icon-math";
+    const span = document.createElement("span");
+    span.className = "mathjax-tex";
+    span.textContent = `\\(${tex}\\)`;
+    div.appendChild(span);
+    foreign.appendChild(div);
+    g.appendChild(foreign);
+    queueMathJaxTypeset();
   };
   if (type === "constant") {
     g.appendChild(createSvgElement("line", { x1: 2, y1: mid, x2: size - 2, y2: mid }));
@@ -301,7 +511,7 @@ function drawIcon(type, x, y) {
   } else if (type === "tf") {
     addText("TF");
   } else if (type === "dtf") {
-    addText("z^-1");
+    addMath("z^{-1}");
   } else if (type === "zoh") {
     addText("ZOH");
   } else if (type === "foh") {
@@ -310,6 +520,14 @@ function drawIcon(type, x, y) {
     addText("1/s");
   } else if (type === "derivative") {
     addText("d/dt");
+  } else if (type === "delay") {
+    addText("e^-sT");
+  } else if (type === "ddelay") {
+    addMath("z^{-1}");
+  } else if (type === "stateSpace") {
+    addText("SS");
+  } else if (type === "dstateSpace") {
+    addText("SSd");
   } else {
     addText("fx");
   }
@@ -361,13 +579,13 @@ function buildPolyMathML(coeffs = []) {
   return `<mrow>${parts.join("")}</mrow>`;
 }
 
-function buildTransferTeX(num = [], den = []) {
-  const numRow = buildPolyTeX(num);
-  const denRow = buildPolyTeX(den);
+function buildTransferTeX(num = [], den = [], variable = "s") {
+  const numRow = buildPolyTeX(num, variable);
+  const denRow = buildPolyTeX(den, variable);
   return `\\frac{${numRow}}{${denRow}}`;
 }
 
-function buildPolyTeX(coeffs = []) {
+function buildPolyTeX(coeffs = [], variable = "s") {
   const list = Array.isArray(coeffs) ? coeffs : [];
   if (list.length === 0) return "0";
   const degree = list.length - 1;
@@ -392,9 +610,9 @@ function buildPolyTeX(coeffs = []) {
       parts.push(`${abs}`);
     }
     if (power === 1) {
-      parts.push("s");
+      parts.push(variable);
     } else {
-      parts.push(`s^{${power}}`);
+      parts.push(`${variable}^{${power}}`);
     }
   });
   if (parts.length === 0) return "0";
@@ -403,88 +621,183 @@ function buildPolyTeX(coeffs = []) {
 
 const blockTemplates = {
   constant: {
-    width: 120,
-    height: 60,
+    width: 80,
+    height: 80,
     inputs: [],
-    outputs: [{ x: 120, y: 30, side: "right" }],
+    outputs: [{ x: 80, y: 40, side: "right" }],
     defaultParams: { value: 1 },
     render: (block) => {
-      renderRectBlock(block, "Constant", [`${block.params.value}`], "constant");
+      const group = block.group;
+      group.appendChild(svgRect(0, 0, block.width, block.height, "block-body"));
+      const mathGroup = createSvgElement("g", { class: "constant-math" });
+      group.appendChild(mathGroup);
+      renderTeXMath(mathGroup, `${block.params.value}`, block.width, block.height);
     },
   },
   step: {
-    width: 140,
-    height: 70,
+    width: 80,
+    height: 80,
     inputs: [],
-    outputs: [{ x: 140, y: 35, side: "right" }],
+    outputs: [{ x: 80, y: 40, side: "right" }],
     defaultParams: { stepTime: 0 },
     render: (block) => {
-      renderRectBlock(block, "Step", [`t=${block.params.stepTime}`], "step");
+      const axisX = 14;
+      const axisY = block.height - 16;
+      const axisTop = 14;
+      const axisRight = block.width - 14;
+      const baseline = axisY - 6;
+      const stepPath = `M${axisX} ${baseline} H${axisX + 16} V${axisTop + 8} H${axisRight - 4}`;
+      renderSourcePlot(block.group, block.width, block.height, stepPath);
     },
   },
   ramp: {
-    width: 120,
-    height: 60,
+    width: 80,
+    height: 80,
     inputs: [],
-    outputs: [{ x: 120, y: 30, side: "right" }],
+    outputs: [{ x: 80, y: 40, side: "right" }],
     defaultParams: { slope: 1, start: 0 },
     render: (block) => {
-      renderRectBlock(block, "Ramp", [`m=${block.params.slope} t0=${block.params.start}`], "ramp");
+      const axisX = 14;
+      const axisY = block.height - 16;
+      const axisTop = 14;
+      const axisRight = block.width - 14;
+      const baseline = axisY - 6;
+      const rampPath = `M${axisX} ${baseline} L${axisRight - 4} ${axisTop + 8}`;
+      renderSourcePlot(block.group, block.width, block.height, rampPath);
     },
   },
   impulse: {
-    width: 120,
-    height: 60,
+    width: 80,
+    height: 80,
     inputs: [],
-    outputs: [{ x: 120, y: 30, side: "right" }],
+    outputs: [{ x: 80, y: 40, side: "right" }],
     defaultParams: { time: 0, amp: 1 },
     render: (block) => {
-      renderRectBlock(block, "Impulse", [`t=${block.params.time} A=${block.params.amp}`], "impulse");
+      const axisX = 14;
+      const axisY = block.height - 16;
+      const axisTop = 14;
+      const baseline = axisY - 6;
+      const spikeX = axisX + 22;
+      const impulsePath = `M${axisX} ${baseline} H${spikeX - 2} V${axisTop + 6} H${spikeX + 2} V${baseline} H${block.width - 18}`;
+      renderSourcePlot(block.group, block.width, block.height, impulsePath);
     },
   },
   sine: {
-    width: 130,
-    height: 70,
+    width: 80,
+    height: 80,
     inputs: [],
-    outputs: [{ x: 130, y: 35, side: "right" }],
+    outputs: [{ x: 80, y: 40, side: "right" }],
     defaultParams: { amp: 1, freq: 1, phase: 0 },
     render: (block) => {
-      renderRectBlock(block, "Sine", [`A=${block.params.amp} f=${block.params.freq}`, `ph=${block.params.phase}`], "sine");
+      const axisX = 14;
+      const axisY = block.height - 16;
+      const axisTop = 14;
+      const axisRight = block.width - 14;
+      const midY = (axisY + axisTop) / 2;
+      const amp = (axisY - axisTop) / 3;
+      const w = axisRight - axisX - 4;
+      const sinePath = `M${axisX} ${midY}
+        C${axisX + w * 0.25} ${midY - amp}, ${axisX + w * 0.25} ${midY - amp}, ${axisX + w * 0.5} ${midY}
+        C${axisX + w * 0.75} ${midY + amp}, ${axisX + w * 0.75} ${midY + amp}, ${axisX + w} ${midY}`;
+      renderSourcePlot(block.group, block.width, block.height, sinePath);
     },
   },
   chirp: {
-    width: 140,
-    height: 70,
+    width: 80,
+    height: 80,
     inputs: [],
-    outputs: [{ x: 140, y: 35, side: "right" }],
+    outputs: [{ x: 80, y: 40, side: "right" }],
     defaultParams: { amp: 1, f0: 1, f1: 5, t1: 10 },
     render: (block) => {
-      renderRectBlock(
-        block,
-        "Chirp",
-        [`A=${block.params.amp} f0=${block.params.f0}`, `f1=${block.params.f1} t1=${block.params.t1}`],
-        "chirp"
-      );
+      const axisX = 14;
+      const axisY = block.height - 16;
+      const axisTop = 14;
+      const axisRight = block.width - 14;
+      const midY = (axisY + axisTop) / 2;
+      const amp = (axisY - axisTop) / 3;
+      const w = axisRight - axisX - 4;
+      const chirpPath = `M${axisX} ${midY}
+        C${axisX + w * 0.18} ${midY - amp}, ${axisX + w * 0.18} ${midY - amp}, ${axisX + w * 0.3} ${midY}
+        C${axisX + w * 0.42} ${midY + amp}, ${axisX + w * 0.42} ${midY + amp}, ${axisX + w * 0.54} ${midY}
+        C${axisX + w * 0.62} ${midY - amp}, ${axisX + w * 0.62} ${midY - amp}, ${axisX + w * 0.7} ${midY}
+        C${axisX + w * 0.76} ${midY + amp}, ${axisX + w * 0.76} ${midY + amp}, ${axisX + w * 0.82} ${midY}
+        C${axisX + w * 0.86} ${midY - amp}, ${axisX + w * 0.86} ${midY - amp}, ${axisX + w * 0.9} ${midY}
+        C${axisX + w * 0.93} ${midY + amp}, ${axisX + w * 0.93} ${midY + amp}, ${axisX + w * 0.96} ${midY}
+        C${axisX + w * 0.98} ${midY - amp}, ${axisX + w * 0.98} ${midY - amp}, ${axisX + w} ${midY}`;
+      renderSourcePlot(block.group, block.width, block.height, chirpPath);
     },
   },
   noise: {
-    width: 120,
-    height: 60,
+    width: 80,
+    height: 80,
     inputs: [],
-    outputs: [{ x: 120, y: 30, side: "right" }],
+    outputs: [{ x: 80, y: 40, side: "right" }],
     defaultParams: { amp: 1 },
     render: (block) => {
-      renderRectBlock(block, "Noise", [`A=${block.params.amp}`], "noise");
+      const axisX = 14;
+      const axisY = block.height - 16;
+      const axisTop = 14;
+      const axisRight = block.width - 14;
+      const minX = axisX + 2;
+      const maxX = axisRight - 2;
+      const minY = axisTop + 2;
+      const maxY = axisY - 2;
+      const midY = (minY + maxY) / 2;
+      const amp = (maxY - minY) / 2;
+      const offsets = [0, -0.2, 0.6, -0.9, 0.3, -0.7, 0.95, -0.4, 0.8, -0.95, 0.5, -0.6, 0.9, -0.3, 0.7, -0.85, 0.4];
+      const step = (maxX - minX) / (offsets.length - 1);
+      const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
+      const points = offsets.map((val, idx) => {
+        const x = clamp(minX + idx * step, minX, maxX);
+        const y = clamp(midY + val * amp, minY, maxY);
+        return { x, y };
+      });
+      const noisePath = points
+        .map((pt, idx) => `${idx === 0 ? "M" : "L"}${pt.x} ${pt.y}`)
+        .join(" ");
+      renderSourcePlot(block.group, block.width, block.height, noisePath);
     },
   },
   fileSource: {
-    width: 140,
-    height: 60,
+    width: 80,
+    height: 80,
     inputs: [],
-    outputs: [{ x: 140, y: 30, side: "right" }],
+    outputs: [{ x: 80, y: 40, side: "right" }],
     defaultParams: { path: "signal.csv" },
     render: (block) => {
-      renderRectBlock(block, "File In", [block.params.path], "file");
+      const group = block.group;
+      group.appendChild(svgRect(0, 0, block.width, block.height, "block-body"));
+      const iconW = 44;
+      const iconH = 54;
+      const x = (block.width - iconW) / 2;
+      const y = (block.height - iconH) / 2;
+      const fold = 12;
+      group.appendChild(
+        createSvgElement("path", {
+          d: [
+            `M${x} ${y}`,
+            `H${x + iconW - fold}`,
+            `L${x + iconW} ${y + fold}`,
+            `V${y + iconH}`,
+            `H${x}`,
+            "Z",
+          ].join(" "),
+          class: "file-icon-stroke",
+        })
+      );
+      group.appendChild(
+        createSvgElement("polyline", {
+          points: `${x + iconW - fold},${y} ${x + iconW - fold},${y + fold} ${x + iconW},${y + fold}`,
+          class: "file-icon-stroke",
+        })
+      );
+      group.appendChild(
+        createSvgElement(
+          "text",
+          { x: block.width / 2, y: block.height / 2 + 4, class: "file-icon-label upright", "text-anchor": "middle" },
+          "IN"
+        )
+      );
     },
   },
   sum: {
@@ -500,8 +813,8 @@ const blockTemplates = {
     render: (block) => {
       const group = block.group;
       group.appendChild(createSvgElement("circle", { cx: 20, cy: 20, r: 20, class: "sum-circle" }));
-      group.appendChild(createSvgElement("line", { x1: 20, y1: 2, x2: 20, y2: 38, class: "sum-line" }));
-      group.appendChild(createSvgElement("line", { x1: 2, y1: 20, x2: 38, y2: 20, class: "sum-line" }));
+      group.appendChild(createSvgElement("line", { x1: 20, y1: 0, x2: 20, y2: 40, class: "sum-line" }));
+      group.appendChild(createSvgElement("line", { x1: 0, y1: 20, x2: 40, y2: 20, class: "sum-line" }));
       const signPositions = [
         { x: -12, y: 12 },
         { x: 32, y: -6 },
@@ -525,32 +838,56 @@ const blockTemplates = {
     },
   },
   mult: {
-    width: 50,
-    height: 50,
+    width: 40,
+    height: 40,
     inputs: [
-      { x: 0, y: 25, side: "left" },
-      { x: 25, y: 0, side: "top" },
+      { x: 0, y: 20, side: "left" },
+      { x: 20, y: 0, side: "top" },
+      { x: 20, y: 40, side: "bottom" },
     ],
-    outputs: [{ x: 50, y: 25, side: "right" }],
+    outputs: [{ x: 40, y: 20, side: "right" }],
     defaultParams: {},
     render: (block) => {
       const group = block.group;
-      group.appendChild(createSvgElement("circle", { cx: 25, cy: 25, r: 25, class: "sum-circle" }));
-      group.appendChild(createSvgElement("line", { x1: 12, y1: 12, x2: 38, y2: 38, class: "sum-line" }));
-      group.appendChild(createSvgElement("line", { x1: 38, y1: 12, x2: 12, y2: 38, class: "sum-line" }));
+      const r = 20;
+      const offset = r / Math.SQRT2;
+      group.appendChild(createSvgElement("circle", { cx: 20, cy: 20, r: 20, class: "sum-circle" }));
+      group.appendChild(
+        createSvgElement("line", {
+          x1: 20 - offset,
+          y1: 20 - offset,
+          x2: 20 + offset,
+          y2: 20 + offset,
+          class: "sum-line",
+        })
+      );
+      group.appendChild(
+        createSvgElement("line", {
+          x1: 20 + offset,
+          y1: 20 - offset,
+          x2: 20 - offset,
+          y2: 20 + offset,
+          class: "sum-line",
+        })
+      );
     },
   },
   gain: {
-    width: 92,
+    width: 100,
     height: 80,
     inputs: [{ x: 0, y: 40, side: "left" }],
-    outputs: [{ x: 92, y: 40, side: "right" }],
+    outputs: [{ x: 100, y: 40, side: "right" }],
     defaultParams: { gain: 2 },
     render: (block) => {
       const group = block.group;
-      const points = "6,6 6,74 86,40";
+      const points = "0,0 0,80 100,40";
       group.appendChild(createSvgElement("polygon", { points, class: "gain-triangle" }));
-      group.appendChild(createSvgElement("text", { x: 24, y: 40, class: "gain-text" }, `${block.params.gain}`));
+      const mathGroup = createSvgElement("g", {
+        class: "gain-math",
+        transform: `translate(${block.width / 3 - block.width / 2}, 0)`,
+      });
+      group.appendChild(mathGroup);
+      renderTeXMath(mathGroup, `${block.params.gain}`, block.width, block.height);
     },
   },
   integrator: {
@@ -575,74 +912,200 @@ const blockTemplates = {
       renderTeXMath(mathGroup, "\\frac{1}{s}", block.width, block.height);
     },
   },
+  delay: {
+    width: 80,
+    height: 80,
+    inputs: [{ x: 0, y: 40, side: "left" }],
+    outputs: [{ x: 80, y: 40, side: "right" }],
+    defaultParams: { delay: 0.1 },
+    render: (block) => {
+      const group = block.group;
+      group.appendChild(svgRect(0, 0, block.width, block.height, "block-body"));
+      const mathGroup = createSvgElement("g", { class: "delay-math" });
+      group.appendChild(mathGroup);
+      renderTeXMath(mathGroup, "e^{-sT}", block.width, block.height);
+    },
+  },
+  stateSpace: {
+    width: 160,
+    height: 80,
+    inputs: [{ x: 0, y: 40, side: "left" }],
+    outputs: [{ x: 160, y: 40, side: "right" }],
+    defaultParams: { A: 1, B: 1, C: 1, D: 0 },
+    render: (block) => {
+      const group = block.group;
+      group.appendChild(svgRect(0, 0, block.width, block.height, "block-body"));
+      const mathGroup = createSvgElement("g", { class: "ss-math" });
+      group.appendChild(mathGroup);
+      renderTeXMath(
+        mathGroup,
+        "\\begin{aligned}\\dot{x}&=Ax+Bu\\\\y&=Cx+Du\\end{aligned}",
+        block.width,
+        block.height
+      );
+    },
+  },
   derivative: {
-    width: 100,
-    height: 60,
-    inputs: [{ x: 0, y: 30, side: "left" }],
-    outputs: [{ x: 100, y: 30, side: "right" }],
+    width: 80,
+    height: 80,
+    inputs: [{ x: 0, y: 40, side: "left" }],
+    outputs: [{ x: 80, y: 40, side: "right" }],
     defaultParams: {},
     render: (block) => {
-      renderRectBlock(block, "Derivative", ["d/dt"], "derivative");
+      const group = block.group;
+      group.appendChild(
+        createSvgElement("rect", {
+          x: 0,
+          y: 0,
+          width: block.width,
+          height: block.height,
+          class: "block-body derivative-body",
+        })
+      );
+      const mathGroup = createSvgElement("g", { class: "derivative-math" });
+      group.appendChild(mathGroup);
+      renderTeXMath(mathGroup, "\\frac{d}{dt}", block.width, block.height);
     },
   },
   lpf: {
-    width: 120,
-    height: 60,
-    inputs: [{ x: 0, y: 30, side: "left" }],
-    outputs: [{ x: 120, y: 30, side: "right" }],
+    width: 80,
+    height: 80,
+    inputs: [{ x: 0, y: 40, side: "left" }],
+    outputs: [{ x: 80, y: 40, side: "right" }],
     defaultParams: { cutoff: 1 },
     render: (block) => {
-      renderRectBlock(block, "LPF", [`fc=${block.params.cutoff}`], "lpf");
+      const axisX = 14;
+      const axisY = block.height - 16;
+      const axisTop = 14;
+      const axisRight = block.width - 14;
+      const midY = (axisY + axisTop) / 2;
+      const startX = axisX + 2;
+      const kneeX = axisX + (axisRight - axisX) * 0.55;
+      const endX = axisRight - 2;
+      const flatY = midY - 8;
+      const endY = axisY - 6;
+      const lpfPath = `M${startX} ${flatY} L${kneeX} ${flatY} L${endX} ${endY}`;
+      renderSourcePlot(block.group, block.width, block.height, lpfPath);
     },
   },
   hpf: {
-    width: 120,
-    height: 60,
-    inputs: [{ x: 0, y: 30, side: "left" }],
-    outputs: [{ x: 120, y: 30, side: "right" }],
+    width: 80,
+    height: 80,
+    inputs: [{ x: 0, y: 40, side: "left" }],
+    outputs: [{ x: 80, y: 40, side: "right" }],
     defaultParams: { cutoff: 1 },
     render: (block) => {
-      renderRectBlock(block, "HPF", [`fc=${block.params.cutoff}`], "hpf");
+      const axisX = 14;
+      const axisY = block.height - 16;
+      const axisTop = 14;
+      const axisRight = block.width - 14;
+      const midY = (axisY + axisTop) / 2;
+      const startX = axisX + 2;
+      const kneeX = axisX + (axisRight - axisX) * 0.45;
+      const endX = axisRight - 2;
+      const startY = axisY - 6;
+      const flatY = midY - 8;
+      const hpfPath = `M${startX} ${startY} L${kneeX} ${flatY} L${endX} ${flatY}`;
+      renderSourcePlot(block.group, block.width, block.height, hpfPath);
     },
   },
   pid: {
-    width: 140,
-    height: 70,
-    inputs: [{ x: 0, y: 35, side: "left" }],
-    outputs: [{ x: 140, y: 35, side: "right" }],
+    width: 80,
+    height: 80,
+    inputs: [{ x: 0, y: 40, side: "left" }],
+    outputs: [{ x: 80, y: 40, side: "right" }],
     defaultParams: { kp: 1, ki: 0, kd: 0 },
     render: (block) => {
-      renderRectBlock(block, "PID", [`Kp=${block.params.kp} Ki=${block.params.ki}`, `Kd=${block.params.kd}`], "pid");
+      const group = block.group;
+      group.appendChild(svgRect(0, 0, block.width, block.height, "block-body"));
+      const mathGroup = createSvgElement("g", { class: "pid-math" });
+      group.appendChild(mathGroup);
+      renderTeXMath(mathGroup, "\\mathsf{PID}", block.width, block.height);
     },
   },
   saturation: {
-    width: 110,
-    height: 60,
-    inputs: [{ x: 0, y: 30, side: "left" }],
-    outputs: [{ x: 110, y: 30, side: "right" }],
+    width: 80,
+    height: 80,
+    inputs: [{ x: 0, y: 40, side: "left" }],
+    outputs: [{ x: 80, y: 40, side: "right" }],
     defaultParams: { min: -1, max: 1 },
     render: (block) => {
-      renderRectBlock(block, "Saturation", [`${block.params.min}..${block.params.max}`], "saturation");
+      const axisLeft = 14;
+      const axisRight = block.width - 14;
+      const axisTop = 14;
+      const axisBottom = block.height - 14;
+      const midX = (axisLeft + axisRight) / 2;
+      const midY = (axisTop + axisBottom) / 2;
+      const flatY = midY - 16;
+      const lowY = midY + 16;
+      const leftX = axisLeft + 6;
+      const rightX = axisRight - 6;
+      const satPath = `M${leftX} ${lowY} L${midX - 10} ${lowY} L${midX + 10} ${flatY} L${rightX} ${flatY}`;
+      renderCenteredAxesPlot(block.group, block.width, block.height, satPath);
     },
   },
   rate: {
-    width: 110,
-    height: 60,
-    inputs: [{ x: 0, y: 30, side: "left" }],
-    outputs: [{ x: 110, y: 30, side: "right" }],
+    width: 80,
+    height: 80,
+    inputs: [{ x: 0, y: 40, side: "left" }],
+    outputs: [{ x: 80, y: 40, side: "right" }],
     defaultParams: { rise: 1, fall: 1 },
     render: (block) => {
-      renderRectBlock(block, "Rate Limit", [`r=${block.params.rise} f=${block.params.fall}`], "rate");
+      const axisLeft = 14;
+      const axisRight = block.width - 14;
+      const axisTop = 14;
+      const axisBottom = block.height - 14;
+      const midX = (axisLeft + axisRight) / 2;
+      const midY = (axisTop + axisBottom) / 2;
+      const leftX = axisLeft + 6;
+      const rightX = axisRight - 6;
+      const curveEndX = midX + 6;
+      const curveEndY = midY - 8;
+      const dashedPath = `M${leftX} ${midY + 14} C${leftX + 6} ${midY + 10} ${midX - 4} ${midY + 2} ${curveEndX} ${curveEndY}`;
+      const solidPath = `M${leftX} ${midY + 14} C${leftX + 8} ${midY + 10} ${midX - 2} ${midY + 2} ${curveEndX} ${curveEndY} L${rightX} ${midY - 14}`;
+      renderCenteredAxesPlot(block.group, block.width, block.height, null);
+      block.group.appendChild(
+        createSvgElement("path", {
+          d: dashedPath,
+          class: "source-plot dashed-plot",
+        })
+      );
+      block.group.appendChild(
+        createSvgElement("path", {
+          d: solidPath,
+          class: "source-plot",
+        })
+      );
     },
   },
   backlash: {
-    width: 110,
-    height: 60,
-    inputs: [{ x: 0, y: 30, side: "left" }],
-    outputs: [{ x: 110, y: 30, side: "right" }],
+    width: 80,
+    height: 80,
+    inputs: [{ x: 0, y: 40, side: "left" }],
+    outputs: [{ x: 80, y: 40, side: "right" }],
     defaultParams: { width: 1 },
     render: (block) => {
-      renderRectBlock(block, "Backlash", [`w=${block.params.width}`], "backlash");
+      const axisLeft = 14;
+      const axisRight = block.width - 14;
+      const axisTop = 14;
+      const axisBottom = block.height - 14;
+      const midX = (axisLeft + axisRight) / 2;
+      const midY = (axisTop + axisBottom) / 2;
+      const leftX = axisLeft + 6;
+      const rightX = axisRight - 6;
+      const gap = 8;
+      const slope = 10;
+      const lowY = midY + slope;
+      const highY = midY - slope;
+      const lowerPath = `M${leftX} ${lowY} L${midX - gap} ${lowY} L${midX + gap} ${highY} L${rightX} ${highY}`;
+      const upperPath = `M${leftX} ${lowY + 6} L${midX - gap} ${lowY + 6} L${midX + gap} ${highY + 6} L${rightX} ${highY + 6}`;
+      renderCenteredAxesPlot(block.group, block.width, block.height, null);
+      block.group.appendChild(
+        createSvgElement("path", { d: lowerPath, class: "source-plot" })
+      );
+      block.group.appendChild(
+        createSvgElement("path", { d: upperPath, class: "source-plot" })
+      );
     },
   },
   tf: {
@@ -668,47 +1131,92 @@ const blockTemplates = {
     },
   },
   zoh: {
-    width: 100,
-    height: 60,
-    inputs: [{ x: 0, y: 30, side: "left" }],
-    outputs: [{ x: 100, y: 30, side: "right" }],
+    width: 80,
+    height: 80,
+    inputs: [{ x: 0, y: 40, side: "left" }],
+    outputs: [{ x: 80, y: 40, side: "right" }],
     defaultParams: { ts: 0.1 },
     render: (block) => {
-      renderRectBlock(block, "ZOH", [`Ts=${block.params.ts}`], "zoh");
+      const group = block.group;
+      group.appendChild(svgRect(0, 0, block.width, block.height, "block-body"));
+      const mathGroup = createSvgElement("g", { class: "zoh-math" });
+      group.appendChild(mathGroup);
+      renderTeXMath(mathGroup, "\\mathsf{ZOH}", block.width, block.height);
     },
   },
   foh: {
-    width: 100,
-    height: 60,
-    inputs: [{ x: 0, y: 30, side: "left" }],
-    outputs: [{ x: 100, y: 30, side: "right" }],
+    width: 80,
+    height: 80,
+    inputs: [{ x: 0, y: 40, side: "left" }],
+    outputs: [{ x: 80, y: 40, side: "right" }],
     defaultParams: { ts: 0.1 },
     render: (block) => {
-      renderRectBlock(block, "FOH", [`Ts=${block.params.ts}`], "foh");
+      const group = block.group;
+      group.appendChild(svgRect(0, 0, block.width, block.height, "block-body"));
+      const mathGroup = createSvgElement("g", { class: "foh-math" });
+      group.appendChild(mathGroup);
+      renderTeXMath(mathGroup, "\\mathsf{FOH}", block.width, block.height);
     },
   },
   dtf: {
     width: 140,
-    height: 70,
-    inputs: [{ x: 0, y: 35, side: "left" }],
-    outputs: [{ x: 140, y: 35, side: "right" }],
+    height: 80,
+    inputs: [{ x: 0, y: 40, side: "left" }],
+    outputs: [{ x: 140, y: 40, side: "right" }],
     defaultParams: { num: [1], den: [1, -0.5], ts: 0.1 },
     render: (block) => {
-      renderRectBlock(
-        block,
-        "Discrete TF",
-        [`num=[${block.params.num.join(",")}]`, `den=[${block.params.den.join(",")}] Ts=${block.params.ts}`],
-        "dtf"
+      const group = block.group;
+      group.appendChild(svgRect(0, 0, block.width, block.height, "block-body"));
+      const mathGroup = createSvgElement("g", { class: "dtf-math" });
+      group.appendChild(mathGroup);
+      renderTeXMath(
+        mathGroup,
+        buildTransferTeX(block.params.num, block.params.den, "z"),
+        block.width,
+        block.height
       );
+    },
+  },
+  dstateSpace: {
+    width: 200,
+    height: 80,
+    inputs: [{ x: 0, y: 40, side: "left" }],
+    outputs: [{ x: 200, y: 40, side: "right" }],
+    defaultParams: { A: 1, B: 1, C: 1, D: 0, ts: 0.1 },
+    render: (block) => {
+      const group = block.group;
+      group.appendChild(svgRect(0, 0, block.width, block.height, "block-body"));
+      const mathGroup = createSvgElement("g", { class: "dss-math" });
+      group.appendChild(mathGroup);
+      renderTeXMath(
+        mathGroup,
+        "\\begin{aligned}x_{k+1}&=Ax_k+Bu_k\\\\y_k&=Cx_k+Du_k\\end{aligned}",
+        block.width,
+        block.height
+      );
+    },
+  },
+  ddelay: {
+    width: 80,
+    height: 80,
+    inputs: [{ x: 0, y: 40, side: "left" }],
+    outputs: [{ x: 80, y: 40, side: "right" }],
+    defaultParams: { steps: 1, ts: 0.1 },
+    render: (block) => {
+      const group = block.group;
+      group.appendChild(svgRect(0, 0, block.width, block.height, "block-body"));
+      const mathGroup = createSvgElement("g", { class: "ddelay-math" });
+      group.appendChild(mathGroup);
+      renderTeXMath(mathGroup, "z^{-1}", block.width, block.height);
     },
   },
   scope: {
     width: 220,
-    height: 140,
+    height: 160,
     inputs: [
-      { x: 0, y: 50, side: "left" },
-      { x: 0, y: 70, side: "left" },
-      { x: 0, y: 90, side: "left" },
+      { x: 0, y: 40, side: "left" },
+      { x: 0, y: 80, side: "left" },
+      { x: 0, y: 120, side: "left" },
     ],
     outputs: [],
     defaultParams: {},
@@ -716,10 +1224,19 @@ const blockTemplates = {
       const group = block.group;
       group.appendChild(svgRect(0, 0, block.width, block.height, "block-body"));
       group.appendChild(svgText(10, 20, "Scope"));
-      const icon = drawIcon("scope", block.width - 28, 8);
-      if (icon) group.appendChild(icon);
-      const plot = svgRect(10, 30, block.width - 20, block.height - 40, "scope-plot");
+      const plotHeight = block.height - 40;
+      const plot = svgRect(10, 30, block.width - 20, plotHeight, "scope-plot");
       group.appendChild(plot);
+      const axesGroup = createSvgElement("g", { class: "scope-axes" });
+      const xAxis = createSvgElement("line", { class: "scope-axis" });
+      const yAxis = createSvgElement("line", { class: "scope-axis" });
+      axesGroup.appendChild(xAxis);
+      axesGroup.appendChild(yAxis);
+      const xTicks = Array.from({ length: 9 }, () => createSvgElement("line", { class: "scope-tick" }));
+      const yTicks = Array.from({ length: 9 }, () => createSvgElement("line", { class: "scope-tick" }));
+      xTicks.forEach((tick) => axesGroup.appendChild(tick));
+      yTicks.forEach((tick) => axesGroup.appendChild(tick));
+      group.appendChild(axesGroup);
       const colors = ["scope-path-1", "scope-path-2", "scope-path-3"];
       block.scopePaths = colors.map((cls) => {
         const path = createSvgElement("path", { class: `scope-path ${cls}` });
@@ -727,21 +1244,77 @@ const blockTemplates = {
         return path;
       });
       block.scopePlot = plot;
+      block.scopeAxes = { xAxis, yAxis, xTicks, yTicks };
     },
   },
   fileSink: {
-    width: 140,
-    height: 60,
-    inputs: [{ x: 0, y: 30, side: "left" }],
+    width: 80,
+    height: 80,
+    inputs: [{ x: 0, y: 40, side: "left" }],
     outputs: [],
     defaultParams: { path: "output.csv" },
     render: (block) => {
-      renderRectBlock(block, "File Out", [block.params.path], "file");
+      const group = block.group;
+      group.appendChild(svgRect(0, 0, block.width, block.height, "block-body"));
+      const iconW = 44;
+      const iconH = 54;
+      const x = (block.width - iconW) / 2;
+      const y = (block.height - iconH) / 2;
+      const fold = 12;
+      group.appendChild(
+        createSvgElement("path", {
+          d: [
+            `M${x} ${y}`,
+            `H${x + iconW - fold}`,
+            `L${x + iconW} ${y + fold}`,
+            `V${y + iconH}`,
+            `H${x}`,
+            "Z",
+          ].join(" "),
+          class: "file-icon-stroke",
+        })
+      );
+      group.appendChild(
+        createSvgElement("polyline", {
+          points: `${x + iconW - fold},${y} ${x + iconW - fold},${y + fold} ${x + iconW},${y + fold}`,
+          class: "file-icon-stroke",
+        })
+      );
+      group.appendChild(
+        createSvgElement(
+          "text",
+          { x: block.width / 2, y: block.height / 2 + 4, class: "file-icon-label upright", "text-anchor": "middle" },
+          "OUT"
+        )
+      );
     },
   },
 };
 
 export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state, onSelectBlock, onSelectConnection }) {
+  const ensureWireArrowMarker = () => {
+    let defs = svg.querySelector("defs");
+    if (!defs) {
+      defs = createSvgElement("defs");
+      svg.insertBefore(defs, svg.firstChild);
+    }
+    if (!defs.querySelector("#wire-arrow")) {
+      const marker = createSvgElement("marker", {
+        id: "wire-arrow",
+        markerWidth: 16,
+        markerHeight: 16,
+        refX: 16,
+        refY: 8,
+        orient: "auto",
+        markerUnits: "userSpaceOnUse",
+      });
+      marker.appendChild(
+        createSvgElement("path", { d: "M0,0 L16,8 L0,16 Z", class: "wire-arrow" })
+      );
+      defs.appendChild(marker);
+    }
+  };
+  ensureWireArrowMarker();
   const debugLog = document.getElementById("debugLog");
   const copyDebugButton = document.getElementById("copyDebug");
   if (!DEBUG_WIRE_CHECKS && debugLog) {
@@ -809,10 +1382,18 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
   }
 
 
-  function createBlock(type, x = 60, y = 60) {
+  function createBlock(type, x = 60, y = 60, options = {}) {
     const template = blockTemplates[type];
-    const id = `b${state.nextId++}`;
-    const params = { ...(template.defaultParams || {}) };
+    if (!template) return null;
+    const id = options.id || `b${state.nextId++}`;
+    if (options.id) {
+      const match = /^b(\d+)$/.exec(options.id);
+      if (match) {
+        const nextId = Number(match[1]) + 1;
+        if (Number.isFinite(nextId)) state.nextId = Math.max(state.nextId, nextId);
+      }
+    }
+    const params = { ...(template.defaultParams || {}), ...(options.params || {}) };
     const group = createSvgElement("g", {
       class: `svg-block type-${type}`,
       "data-block-id": id,
@@ -825,7 +1406,7 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
       y: snap(y),
       width: template.width,
       height: template.height,
-      rotation: 0,
+      rotation: options.rotation ?? 0,
       inputs: template.inputs.length,
       outputs: template.outputs.length,
       params,
@@ -836,11 +1417,16 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     template.render(block);
 
     const dragHeight = type === "scope" ? 24 : block.height;
+    const minDragSize = 80;
+    const dragWidth = type === "scope" ? block.width : Math.max(block.width, minDragSize);
+    const dragBoxHeight = type === "scope" ? dragHeight : Math.max(dragHeight, minDragSize);
+    const dragX = type === "scope" ? 0 : (block.width - dragWidth) / 2;
+    const dragY = type === "scope" ? 0 : (block.height - dragBoxHeight) / 2;
     const dragRect = createSvgElement("rect", {
-      x: 0,
-      y: 0,
-      width: block.width,
-      height: dragHeight,
+      x: dragX,
+      y: dragY,
+      width: dragWidth,
+      height: dragBoxHeight,
       class: "drag-handle",
     });
     group.appendChild(dragRect);
@@ -880,24 +1466,37 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
       r: 12,
       class: "port-hit",
     });
-    const circle = createSvgElement("circle", {
-      cx: port.x,
-      cy: port.y,
-      r: 6,
-      class: `port ${type}`,
-    });
+    const shape =
+      type === "in"
+        ? createSvgElement("rect", {
+            x: port.x - 6,
+            y: port.y - 6,
+            width: 12,
+            height: 12,
+            class: `port ${type} port-square`,
+          })
+        : createSvgElement("circle", {
+            cx: port.x,
+            cy: port.y,
+            r: 6,
+            class: `port ${type}`,
+          });
     const onClick = (event) => {
       event.stopPropagation();
       handlePortClick(group);
     };
     hit.addEventListener("click", onClick);
-    circle.addEventListener("click", onClick);
+    shape.addEventListener("click", onClick);
     group.appendChild(hit);
-    group.appendChild(circle);
+    group.appendChild(shape);
     return group;
   }
 
   function handlePortClick(portEl) {
+    if (state.suppressNextPortClick) {
+      state.suppressNextPortClick = false;
+      return;
+    }
     const blockId = portEl.getAttribute("data-block-id");
     const portType = portEl.getAttribute("data-port-type");
     const portIndex = Number(portEl.getAttribute("data-port-index"));
@@ -907,6 +1506,7 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
       state.pendingPort = { blockId, portType, portIndex };
       const dot = portEl.querySelector(".port");
       if (dot) dot.classList.add("pending");
+      updatePortVisibility();
       return;
     }
 
@@ -926,30 +1526,47 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     const pending = svg.querySelector(".port.pending");
     if (pending) pending.classList.remove("pending");
     state.pendingPort = null;
+    updatePortVisibility();
   }
 
   function enableDrag(block, handle) {
     let offsetX = 0;
     let offsetY = 0;
     let dragging = false;
+    let didDrag = false;
     let startClient = null;
+    let startedFromPort = false;
     const DRAG_THRESHOLD = 6;
 
-    handle.addEventListener("pointerdown", (event) => {
+    const beginPointer = (event, fromPort = false) => {
       if (state.deleteMode || state.isPinching) return;
-      event.preventDefault();
+      if (!fromPort) event.preventDefault();
       dragging = false;
+      didDrag = false;
+      startedFromPort = fromPort;
       startClient = { x: event.clientX, y: event.clientY };
-      handle.setPointerCapture(event.pointerId);
+      if (!fromPort) handle.setPointerCapture(event.pointerId);
+    };
+
+    handle.addEventListener("pointerdown", (event) => beginPointer(event, false));
+    block.group.addEventListener("pointerdown", (event) => {
+      const isPort = event.target.closest?.(".port-group");
+      if (!isPort) return;
+      beginPointer(event, true);
     });
 
-    handle.addEventListener("pointermove", (event) => {
+    block.group.addEventListener("pointermove", (event) => {
       if (!startClient) return;
       if (!dragging) {
         const dx = event.clientX - startClient.x;
         const dy = event.clientY - startClient.y;
         if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
         dragging = true;
+        didDrag = true;
+        if (startedFromPort) {
+          event.preventDefault();
+          handle.setPointerCapture(event.pointerId);
+        }
         const point = clientToSvg(event.clientX, event.clientY);
         offsetX = point.x - block.x;
         offsetY = point.y - block.y;
@@ -966,19 +1583,24 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
       updateConnections();
     });
 
-    handle.addEventListener("pointerup", (event) => {
+    block.group.addEventListener("pointerup", (event) => {
       if (dragging) event.preventDefault();
       dragging = false;
       startClient = null;
+      if (startedFromPort && didDrag) state.suppressNextPortClick = true;
+      startedFromPort = false;
+      didDrag = false;
       state.fastRouting = false;
       if (state.dirtyBlocks) state.dirtyBlocks.add(block.id);
       state.routingDirty = true;
       updateConnections(true);
     });
 
-    handle.addEventListener("pointercancel", () => {
+    block.group.addEventListener("pointercancel", () => {
       dragging = false;
       startClient = null;
+      startedFromPort = false;
+      didDrag = false;
       state.fastRouting = false;
     });
   }
@@ -988,6 +1610,11 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
       event.stopPropagation();
       selectBlock(block.id);
     });
+  }
+
+  function updatePortVisibility() {
+    const show = Boolean(state.selectedId || state.pendingPort);
+    svg.classList.toggle("ports-visible", show);
   }
 
   function selectBlock(blockId) {
@@ -1000,6 +1627,7 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
       conn.path.classList.toggle("selected", false);
     });
     onSelectBlock(blockId ? state.blocks.get(blockId) : null);
+    updatePortVisibility();
     updateSelectionBox();
   }
 
@@ -1014,6 +1642,7 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     });
     if (!conn) {
       onSelectConnection(null);
+      updatePortVisibility();
       updateSelectionBox();
       return;
     }
@@ -1027,6 +1656,7 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
       fromType: fromBlock?.type || "unknown",
       toType: toBlock?.type || "unknown",
     });
+    updatePortVisibility();
     updateSelectionBox();
   }
 
@@ -1047,7 +1677,7 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
   function createConnection(fromId, toId, toIndex, fromIndex = 0) {
     if (state.connections.some((c) => c.from === fromId && c.to === toId && c.toIndex === toIndex && c.fromIndex === fromIndex)) return;
 
-    const path = createSvgElement("path", { class: "wire" });
+    const path = createSvgElement("path", { class: "wire", "marker-end": "url(#wire-arrow)" });
     wireLayer.appendChild(path);
     const conn = { from: fromId, to: toId, toIndex, fromIndex, path, points: [] };
     path.addEventListener("click", (event) => {
@@ -1722,6 +2352,7 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     blockLayer.innerHTML = "";
     wireLayer.innerHTML = "";
     selectionRect.setAttribute("display", "none");
+    updatePortVisibility();
   }
 
   function findNearestConnection(point, threshold = 12) {
@@ -1763,8 +2394,8 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
 
   function updateBlockLabel(block) {
     if (block.type === "constant") {
-      const texts = block.group.querySelectorAll("text");
-      if (texts[1]) texts[1].textContent = `${block.params.value}`;
+      const mathGroup = block.group.querySelector(".constant-math");
+      if (mathGroup) renderTeXMath(mathGroup, `${block.params.value}`, block.width, block.height);
     }
     if (block.type === "step") {
       const texts = block.group.querySelectorAll("text");
@@ -1792,13 +2423,29 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
       const texts = block.group.querySelectorAll("text");
       if (texts[1]) texts[1].textContent = `A=${block.params.amp}`;
     }
+    if (block.type === "delay") {
+      const mathGroup = block.group.querySelector(".delay-math");
+      if (mathGroup) renderTeXMath(mathGroup, "e^{-sT}", block.width, block.height);
+    }
+    if (block.type === "pid") {
+      const mathGroup = block.group.querySelector(".pid-math");
+      if (mathGroup) renderTeXMath(mathGroup, "\\mathsf{PID}", block.width, block.height);
+    }
+    if (block.type === "zoh") {
+      const mathGroup = block.group.querySelector(".zoh-math");
+      if (mathGroup) renderTeXMath(mathGroup, "\\mathsf{ZOH}", block.width, block.height);
+    }
+    if (block.type === "foh") {
+      const mathGroup = block.group.querySelector(".foh-math");
+      if (mathGroup) renderTeXMath(mathGroup, "\\mathsf{FOH}", block.width, block.height);
+    }
     if (block.type === "fileSource") {
       const texts = block.group.querySelectorAll("text");
       if (texts[1]) texts[1].textContent = `${block.params.path}`;
     }
     if (block.type === "gain") {
-      const label = block.group.querySelector(".gain-text");
-      if (label) label.textContent = `${block.params.gain}`;
+      const mathGroup = block.group.querySelector(".gain-math");
+      if (mathGroup) renderTeXMath(mathGroup, `${block.params.gain}`, block.width, block.height);
     }
     if (block.type === "sum") {
       const signs = block.params.signs || [];
@@ -1820,22 +2467,14 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
       const texts = block.group.querySelectorAll("text");
       if (texts[1]) texts[1].textContent = `fc=${block.params.cutoff}`;
     }
-    if (block.type === "pid") {
-      const texts = block.group.querySelectorAll("text");
-      if (texts[1]) texts[1].textContent = `Kp=${block.params.kp} Ki=${block.params.ki}`;
-      if (texts[2]) texts[2].textContent = `Kd=${block.params.kd}`;
-    }
     if (block.type === "saturation") {
-      const texts = block.group.querySelectorAll("text");
-      if (texts[1]) texts[1].textContent = `${block.params.min}..${block.params.max}`;
+      // icon only
     }
     if (block.type === "rate") {
-      const texts = block.group.querySelectorAll("text");
-      if (texts[1]) texts[1].textContent = `r=${block.params.rise} f=${block.params.fall}`;
+      // icon only
     }
     if (block.type === "backlash") {
-      const texts = block.group.querySelectorAll("text");
-      if (texts[1]) texts[1].textContent = `w=${block.params.width}`;
+      // icon only
     }
     if (block.type === "tf") {
       const mathGroup = block.group.querySelector(".tf-math");
@@ -1848,22 +2487,23 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
         );
       }
     }
-    if (block.type === "zoh") {
-      const texts = block.group.querySelectorAll("text");
-      if (texts[1]) texts[1].textContent = `Ts=${block.params.ts}`;
-    }
-    if (block.type === "foh") {
-      const texts = block.group.querySelectorAll("text");
-      if (texts[1]) texts[1].textContent = `Ts=${block.params.ts}`;
-    }
     if (block.type === "dtf") {
-      const texts = block.group.querySelectorAll("text");
-      if (texts[1]) texts[1].textContent = `num=[${block.params.num.join(",")}]`;
-      if (texts[2]) texts[2].textContent = `den=[${block.params.den.join(",")}] Ts=${block.params.ts}`;
+      const mathGroup = block.group.querySelector(".dtf-math");
+      if (mathGroup) {
+        renderTeXMath(
+          mathGroup,
+          buildTransferTeX(block.params.num, block.params.den, "z"),
+          block.width,
+          block.height
+        );
+      }
+    }
+    if (block.type === "ddelay") {
+      const mathGroup = block.group.querySelector(".ddelay-math");
+      if (mathGroup) renderTeXMath(mathGroup, "z^{-1}", block.width, block.height);
     }
     if (block.type === "fileSink") {
-      const texts = block.group.querySelectorAll("text");
-      if (texts[1]) texts[1].textContent = `${block.params.path}`;
+      // icon only
     }
   }
 
@@ -1880,6 +2520,7 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
 
   return {
     createBlock,
+    createConnection,
     updateConnections,
     updateBlockTransform,
     selectConnection,

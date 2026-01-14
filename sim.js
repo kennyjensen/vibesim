@@ -36,6 +36,12 @@ export function simulate({ state, runtimeInput, statusEl }) {
   const fohState = new Map();
   const dtfState = new Map();
   const backlashState = new Map();
+  const delayState = new Map();
+  const ddelayState = new Map();
+  const fileSourceState = new Map();
+  const fileSinkSeries = new Map();
+  const stateSpaceState = new Map();
+  const dstateSpaceState = new Map();
 
   scopes.forEach((scope) => {
     scopeSeries.set(scope.id, Array(scope.inputs).fill(0).map(() => []));
@@ -61,8 +67,34 @@ export function simulate({ state, runtimeInput, statusEl }) {
       dtfState.set(block.id, { model, xHist: Array(model.num.length).fill(0), yHist: Array(model.den.length - 1).fill(0), nextTime: 0 });
     }
     if (block.type === "backlash") backlashState.set(block.id, 0);
-    if (["lpf", "hpf", "derivative", "pid", "zoh", "foh", "dtf", "backlash"].includes(block.type)) {
+    if (block.type === "delay") {
+      const steps = Math.max(1, Math.round(Number(block.params.delay || 0) / dt));
+      delayState.set(block.id, { buffer: Array(steps + 1).fill(0) });
+    }
+    if (block.type === "ddelay") {
+      const steps = Math.max(1, Math.round(Number(block.params.steps) || 1));
+      const ts = Math.max(0.001, Number(block.params.ts) || 0.1);
+      ddelayState.set(block.id, { queue: Array(steps).fill(0), nextTime: 0, lastOut: 0, ts });
+    }
+    if (block.type === "stateSpace") {
+      stateSpaceState.set(block.id, 0);
+    }
+    if (block.type === "dstateSpace") {
+      const ts = Math.max(0.001, Number(block.params.ts) || 0.1);
+      dstateSpaceState.set(block.id, { x: 0, nextTime: 0, lastOut: 0, ts });
+    }
+    if (["lpf", "hpf", "derivative", "pid", "zoh", "foh", "dtf", "backlash", "delay", "ddelay", "stateSpace", "dstateSpace"].includes(block.type)) {
       outputState.set(block.id, 0);
+    }
+    if (block.type === "fileSource") {
+      const times = Array.isArray(block.params.times) ? block.params.times : [];
+      const values = Array.isArray(block.params.values) ? block.params.values : [];
+      const data = times.length ? { times, values } : null;
+      fileSourceState.set(block.id, { data, idx: 0 });
+    }
+    if (block.type === "fileSink") {
+      fileSinkSeries.set(block.id, { time: [], values: [] });
+      block.params.lastCsv = "";
     }
   });
 
@@ -109,7 +141,17 @@ export function simulate({ state, runtimeInput, statusEl }) {
         outputs.set(block.id, amp * (Math.random() * 2 - 1));
       }
       if (block.type === "fileSource") {
-        outputs.set(block.id, 0);
+        const state = fileSourceState.get(block.id);
+        if (!state?.data) {
+          outputs.set(block.id, 0);
+        } else {
+          const { times, values } = state.data;
+          while (state.idx + 1 < times.length && times[state.idx + 1] <= t) {
+            state.idx += 1;
+          }
+          const value = values[state.idx] ?? 0;
+          outputs.set(block.id, value);
+        }
       }
       if (block.type === "integrator") {
         const prev = integratorState.get(block.id) || 0;
@@ -125,6 +167,20 @@ export function simulate({ state, runtimeInput, statusEl }) {
         const yPrev = model ? outputFromState(model, prev, 0) : 0;
         outputs.set(block.id, yPrev);
       }
+      if (block.type === "stateSpace") {
+        outputs.set(block.id, outputState.get(block.id) || 0);
+      }
+      if (block.type === "dstateSpace") {
+        outputs.set(block.id, outputState.get(block.id) || 0);
+      }
+      if (block.type === "delay") {
+        const state = delayState.get(block.id);
+        const out = state?.buffer[0] ?? 0;
+        outputs.set(block.id, out);
+      }
+      if (block.type === "ddelay") {
+        outputs.set(block.id, outputState.get(block.id) || 0);
+      }
       if (["lpf", "hpf", "derivative", "pid", "zoh", "foh", "dtf", "backlash"].includes(block.type)) {
         outputs.set(block.id, outputState.get(block.id) || 0);
       }
@@ -135,7 +191,7 @@ export function simulate({ state, runtimeInput, statusEl }) {
       progress = false;
       blocks.forEach((block) => {
         if (outputs.has(block.id)) return;
-        if (["scope", "integrator", "tf", "lpf", "hpf", "derivative", "pid", "zoh", "foh", "dtf", "backlash", "fileSink"].includes(block.type)) return;
+        if (["scope", "integrator", "tf", "delay", "ddelay", "stateSpace", "dstateSpace", "lpf", "hpf", "derivative", "pid", "zoh", "foh", "dtf", "backlash", "fileSink"].includes(block.type)) return;
 
         const inputs = inputMap.get(block.id) || [];
         const values = inputs.map((fromId) => (fromId ? outputs.get(fromId) : undefined));
@@ -172,6 +228,17 @@ export function simulate({ state, runtimeInput, statusEl }) {
     });
 
     blocks.forEach((block) => {
+      if (block.type !== "fileSink") return;
+      const inputs = inputMap.get(block.id) || [];
+      const fromId = inputs[0];
+      const value = fromId ? outputs.get(fromId) : null;
+      const series = fileSinkSeries.get(block.id);
+      if (!series) return;
+      series.time.push(t);
+      series.values.push(value ?? 0);
+    });
+
+    blocks.forEach((block) => {
       if (block.type !== "integrator") return;
       const inputs = inputMap.get(block.id) || [];
       const fromId = inputs[0];
@@ -179,6 +246,80 @@ export function simulate({ state, runtimeInput, statusEl }) {
       const prev = integratorState.get(block.id) || 0;
       if (inputVal !== undefined) {
         integratorState.set(block.id, integrateRK4(prev, inputVal, dt));
+      }
+    });
+
+    blocks.forEach((block) => {
+      if (block.type !== "stateSpace") return;
+      const inputs = inputMap.get(block.id) || [];
+      const fromId = inputs[0];
+      const u = fromId ? outputs.get(fromId) : 0;
+      const xPrev = stateSpaceState.get(block.id) || 0;
+      const A = Number(block.params.A) || 0;
+      const B = Number(block.params.B) || 0;
+      const C = Number(block.params.C) || 0;
+      const D = Number(block.params.D) || 0;
+      const dx = A * xPrev + B * (u ?? 0);
+      const xNext = integrateRK4(xPrev, dx, dt);
+      stateSpaceState.set(block.id, xNext);
+      outputState.set(block.id, C * xNext + D * (u ?? 0));
+    });
+
+    blocks.forEach((block) => {
+      if (block.type !== "delay") return;
+      const inputs = inputMap.get(block.id) || [];
+      const fromId = inputs[0];
+      const inputVal = fromId ? outputs.get(fromId) : 0;
+      const state = delayState.get(block.id);
+      if (!state) return;
+      const buffer = state.buffer;
+      buffer.push(inputVal ?? 0);
+      const out = buffer.shift() ?? 0;
+      outputState.set(block.id, out);
+    });
+
+    blocks.forEach((block) => {
+      if (block.type !== "ddelay") return;
+      const inputs = inputMap.get(block.id) || [];
+      const fromId = inputs[0];
+      const inputVal = fromId ? outputs.get(fromId) : 0;
+      const state = ddelayState.get(block.id);
+      if (!state) return;
+      const ts = Math.max(0.001, Number(block.params.ts) || state.ts || 0.1);
+      state.ts = ts;
+      if (t + 1e-9 >= state.nextTime) {
+        state.queue.push(inputVal ?? 0);
+        const out = state.queue.shift() ?? 0;
+        state.lastOut = out;
+        state.nextTime = t + ts;
+        outputState.set(block.id, out);
+      } else {
+        outputState.set(block.id, state.lastOut ?? 0);
+      }
+    });
+
+    blocks.forEach((block) => {
+      if (block.type !== "dstateSpace") return;
+      const inputs = inputMap.get(block.id) || [];
+      const fromId = inputs[0];
+      const u = fromId ? outputs.get(fromId) : 0;
+      const state = dstateSpaceState.get(block.id);
+      if (!state) return;
+      const A = Number(block.params.A) || 0;
+      const B = Number(block.params.B) || 0;
+      const C = Number(block.params.C) || 0;
+      const D = Number(block.params.D) || 0;
+      const ts = Math.max(0.001, Number(block.params.ts) || state.ts || 0.1);
+      state.ts = ts;
+      if (t + 1e-9 >= state.nextTime) {
+        const xNext = A * state.x + B * (u ?? 0);
+        state.x = xNext;
+        const y = C * xNext + D * (u ?? 0);
+        state.lastOut = y;
+        state.nextTime = t + ts;
+        outputState.set(block.id, y);
+      } else {
+        outputState.set(block.id, state.lastOut ?? 0);
       }
     });
 
@@ -317,6 +458,17 @@ export function simulate({ state, runtimeInput, statusEl }) {
     });
   }
 
+  blocks.forEach((block) => {
+    if (block.type !== "fileSink") return;
+    const series = fileSinkSeries.get(block.id);
+    if (!series) return;
+    const rows = ["t,value"];
+    for (let i = 0; i < series.time.length; i += 1) {
+      rows.push(`${series.time[i]},${series.values[i]}`);
+    }
+    block.params.lastCsv = rows.join("\n");
+  });
+
   scopes.forEach((scope) => {
     drawScope(scope, time, scopeSeries.get(scope.id), scopeConnected.get(scope.id));
   });
@@ -336,6 +488,26 @@ export function renderScope(scopeBlock) {
   const plotY = Number(plot.getAttribute("y"));
   const plotW = Number(plot.getAttribute("width"));
   const plotH = Number(plot.getAttribute("height"));
+  const axes = scopeBlock.scopeAxes;
+  const niceStep = (range, target = 5) => {
+    if (!Number.isFinite(range) || range <= 0) return 1;
+    const raw = range / target;
+    const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+    const scaled = raw / pow;
+    let step = 1;
+    if (scaled <= 1) step = 1;
+    else if (scaled <= 2) step = 2;
+    else if (scaled <= 5) step = 5;
+    else step = 10;
+    return step * pow;
+  };
+  const buildTicks = (min, max, step) => {
+    if (!Number.isFinite(min) || !Number.isFinite(max) || !Number.isFinite(step) || step <= 0) return [];
+    const start = Math.ceil(min / step) * step;
+    const ticks = [];
+    for (let v = start; v <= max + step * 0.5; v += step) ticks.push(v);
+    return ticks;
+  };
   const { time, series, connected } = scopeBlock.scopeData;
   const activeSeries = series.filter((_, idx) => (connected ? connected[idx] : true));
   const values = activeSeries.flat().filter((v) => v != null);
@@ -350,7 +522,58 @@ export function renderScope(scopeBlock) {
     maxVal += 1;
     minVal -= 1;
   }
+  const maxAbs = Math.max(Math.abs(maxVal), Math.abs(minVal), 1e-6);
+  maxVal = maxAbs * 1.2;
+  minVal = -maxAbs * 1.2;
   const range = maxVal - minVal;
+
+  if (axes) {
+    const yZero = plotY + plotH - ((0 - minVal) / range) * plotH;
+    const xAxisY = Math.max(plotY, Math.min(plotY + plotH, yZero));
+    axes.xAxis.setAttribute("x1", plotX);
+    axes.xAxis.setAttribute("y1", xAxisY);
+    axes.xAxis.setAttribute("x2", plotX + plotW);
+    axes.xAxis.setAttribute("y2", xAxisY);
+    axes.yAxis.setAttribute("x1", plotX);
+    axes.yAxis.setAttribute("y1", plotY);
+    axes.yAxis.setAttribute("x2", plotX);
+    axes.yAxis.setAttribute("y2", plotY + plotH);
+    const tickLen = 5;
+    const yStep = niceStep(range, 5);
+    const yTicks = buildTicks(minVal, maxVal, yStep);
+    axes.yTicks.forEach((tick, idx) => {
+      if (idx >= yTicks.length) {
+        tick.setAttribute("display", "none");
+        return;
+      }
+      tick.setAttribute("display", "block");
+      const v = yTicks[idx];
+      const y = plotY + plotH - ((v - minVal) / range) * plotH;
+      tick.setAttribute("x1", plotX - tickLen);
+      tick.setAttribute("y1", y);
+      tick.setAttribute("x2", plotX + tickLen);
+      tick.setAttribute("y2", y);
+    });
+    const t0 = Number(time[0] ?? 0);
+    const t1 = Number(time[time.length - 1] ?? t0);
+    const tRange = t1 - t0;
+    const xStep = niceStep(Math.max(1e-6, tRange), 5);
+    const xTicks = tRange <= 0 ? [t0] : buildTicks(t0, t1, xStep);
+    axes.xTicks.forEach((tick, idx) => {
+      if (idx >= xTicks.length) {
+        tick.setAttribute("display", "none");
+        return;
+      }
+      tick.setAttribute("display", "block");
+      const v = xTicks[idx];
+      const ratio = tRange <= 0 ? 0 : (v - t0) / tRange;
+      const x = plotX + ratio * plotW;
+      tick.setAttribute("x1", x);
+      tick.setAttribute("y1", xAxisY - tickLen);
+      tick.setAttribute("x2", x);
+      tick.setAttribute("y2", xAxisY + tickLen);
+    });
+  }
 
   series.forEach((valuesForSeries, seriesIdx) => {
     if (connected && !connected[seriesIdx]) {

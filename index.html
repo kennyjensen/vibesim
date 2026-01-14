@@ -25,6 +25,9 @@
       </label>
       <button id="runBtn">Run</button>
       <button id="clearBtn">Clear</button>
+      <button id="saveBtn">Save</button>
+      <button id="loadBtn">Load</button>
+      <input id="loadInput" type="file" accept=".yaml,.yml,text/yaml" hidden>
       <span id="status" class="status">Idle</span>
     </div>
   </header>
@@ -47,6 +50,8 @@
         <summary>Continuous</summary>
         <button class="tool" data-type="integrator">Integrator</button>
         <button class="tool" data-type="tf">Transfer Function</button>
+        <button class="tool" data-type="delay">Delay</button>
+        <button class="tool" data-type="stateSpace">State Space</button>
         <button class="tool" data-type="lpf">LPF</button>
         <button class="tool" data-type="hpf">HPF</button>
         <button class="tool" data-type="derivative">Derivative</button>
@@ -63,6 +68,8 @@
         <button class="tool" data-type="zoh">ZOH</button>
         <button class="tool" data-type="foh">FOH</button>
         <button class="tool" data-type="dtf">Discrete TF</button>
+        <button class="tool" data-type="ddelay">Discrete Delay</button>
+        <button class="tool" data-type="dstateSpace">Discrete State Space</button>
       </details>
       <details class="tool-group" open>
         <summary>Nonlinear</summary>

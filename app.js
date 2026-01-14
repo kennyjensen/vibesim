@@ -8,6 +8,9 @@ const overlayLayer = document.getElementById("overlayLayer");
 const runBtn = document.getElementById("runBtn");
 const fullRouteBtn = document.getElementById("fullRouteBtn");
 const clearBtn = document.getElementById("clearBtn");
+const saveBtn = document.getElementById("saveBtn");
+const loadBtn = document.getElementById("loadBtn");
+const loadInput = document.getElementById("loadInput");
 const statusEl = document.getElementById("status");
 const runtimeInput = document.getElementById("runtimeInput");
 const inspectorBody = document.getElementById("inspectorBody");
@@ -16,6 +19,15 @@ const rotateSelectionBtn = document.getElementById("rotateSelection");
 const errorBox = document.getElementById("errorBox");
 
 if (rotateSelectionBtn) rotateSelectionBtn.disabled = true;
+
+window.addEventListener("error", (event) => {
+  const message = event?.message || "Unknown error";
+  if (statusEl) statusEl.textContent = `Error: ${message}`;
+});
+window.addEventListener("unhandledrejection", (event) => {
+  const reason = event?.reason?.message || event?.reason || "Unhandled rejection";
+  if (statusEl) statusEl.textContent = `Error: ${reason}`;
+});
 
 const state = {
   blocks: new Map(),
@@ -227,16 +239,97 @@ function renderInspector(block) {
       block.params.amp = Number(ampInput.value);
       renderer.updateBlockLabel(block);
     });
+  } else if (block.type === "delay") {
+    inspectorBody.innerHTML = `
+      <label class="param">Delay (s)
+        <input type="number" data-edit="delay" value="${block.params.delay}" step="0.1" min="0">
+      </label>
+    `;
+    const input = inspectorBody.querySelector("input[data-edit='delay']");
+    input.addEventListener("input", () => {
+      block.params.delay = Math.max(0, Number(input.value));
+      renderer.updateBlockLabel(block);
+    });
+  } else if (block.type === "stateSpace") {
+    inspectorBody.innerHTML = `
+      <label class="param">A
+        <input type="number" data-edit="A" value="${block.params.A}" step="0.1">
+      </label>
+      <label class="param">B
+        <input type="number" data-edit="B" value="${block.params.B}" step="0.1">
+      </label>
+      <label class="param">C
+        <input type="number" data-edit="C" value="${block.params.C}" step="0.1">
+      </label>
+      <label class="param">D
+        <input type="number" data-edit="D" value="${block.params.D}" step="0.1">
+      </label>
+    `;
+    const aInput = inspectorBody.querySelector("input[data-edit='A']");
+    const bInput = inspectorBody.querySelector("input[data-edit='B']");
+    const cInput = inspectorBody.querySelector("input[data-edit='C']");
+    const dInput = inspectorBody.querySelector("input[data-edit='D']");
+    const update = () => {
+      block.params.A = Number(aInput.value);
+      block.params.B = Number(bInput.value);
+      block.params.C = Number(cInput.value);
+      block.params.D = Number(dInput.value);
+    };
+    [aInput, bInput, cInput, dInput].forEach((input) => {
+      input.addEventListener("input", update);
+    });
   } else if (block.type === "fileSource") {
     inspectorBody.innerHTML = `
       <label class="param">File path
         <input type="text" data-edit="path" value="${block.params.path}">
       </label>
+      <label class="param">CSV file
+        <input type="file" data-edit="file" accept=".csv,text/csv">
+      </label>
+      <div class="param">${block.params.loaded ? "Loaded CSV" : "No CSV loaded"}</div>
     `;
     const pathInput = inspectorBody.querySelector("input[data-edit='path']");
+    const fileInput = inspectorBody.querySelector("input[data-edit='file']");
     pathInput.addEventListener("input", () => {
       block.params.path = pathInput.value;
       renderer.updateBlockLabel(block);
+    });
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = String(reader.result || "");
+        const rows = text
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0);
+        const times = [];
+        const values = [];
+        rows.forEach((line, idx) => {
+          const cols = line
+            .split(/[,\t]/)
+            .map((v) => v.trim())
+            .filter((v) => v.length > 0);
+          const nums = cols.map((v) => Number(v)).filter((v) => Number.isFinite(v));
+          if (nums.length === 0) return;
+          if (nums.length >= 2) {
+            times.push(nums[0]);
+            values.push(nums[1]);
+          } else {
+            times.push(idx);
+            values.push(nums[0]);
+          }
+        });
+        const pairs = times.map((t, i) => ({ t, v: values[i] }));
+        pairs.sort((a, b) => a.t - b.t);
+        block.params.times = pairs.map((p) => p.t);
+        block.params.values = pairs.map((p) => p.v);
+        block.params.loaded = pairs.length > 0;
+        renderer.updateBlockLabel(block);
+        renderInspector(block);
+      };
+      reader.readAsText(file);
     });
   } else if (block.type === "gain") {
     inspectorBody.innerHTML = `
@@ -429,16 +522,83 @@ function renderInspector(block) {
       block.params.ts = Number(tsInput.value);
       renderer.updateBlockLabel(block);
     });
+  } else if (block.type === "ddelay") {
+    inspectorBody.innerHTML = `
+      <label class="param">Steps
+        <input type="number" data-edit="steps" value="${block.params.steps}" step="1" min="1">
+      </label>
+      <label class="param">Sample time (s)
+        <input type="number" data-edit="ts" value="${block.params.ts}" step="0.01" min="0.001">
+      </label>
+    `;
+    const stepsInput = inspectorBody.querySelector("input[data-edit='steps']");
+    const tsInput = inspectorBody.querySelector("input[data-edit='ts']");
+    stepsInput.addEventListener("input", () => {
+      block.params.steps = Math.max(1, Math.round(Number(stepsInput.value) || 1));
+      renderer.updateBlockLabel(block);
+    });
+    tsInput.addEventListener("input", () => {
+      block.params.ts = Math.max(0.001, Number(tsInput.value));
+      renderer.updateBlockLabel(block);
+    });
+  } else if (block.type === "dstateSpace") {
+    inspectorBody.innerHTML = `
+      <label class="param">A
+        <input type="number" data-edit="A" value="${block.params.A}" step="0.1">
+      </label>
+      <label class="param">B
+        <input type="number" data-edit="B" value="${block.params.B}" step="0.1">
+      </label>
+      <label class="param">C
+        <input type="number" data-edit="C" value="${block.params.C}" step="0.1">
+      </label>
+      <label class="param">D
+        <input type="number" data-edit="D" value="${block.params.D}" step="0.1">
+      </label>
+      <label class="param">Sample time (s)
+        <input type="number" data-edit="ts" value="${block.params.ts}" step="0.01" min="0.001">
+      </label>
+    `;
+    const aInput = inspectorBody.querySelector("input[data-edit='A']");
+    const bInput = inspectorBody.querySelector("input[data-edit='B']");
+    const cInput = inspectorBody.querySelector("input[data-edit='C']");
+    const dInput = inspectorBody.querySelector("input[data-edit='D']");
+    const tsInput = inspectorBody.querySelector("input[data-edit='ts']");
+    const update = () => {
+      block.params.A = Number(aInput.value);
+      block.params.B = Number(bInput.value);
+      block.params.C = Number(cInput.value);
+      block.params.D = Number(dInput.value);
+      block.params.ts = Math.max(0.001, Number(tsInput.value));
+    };
+    [aInput, bInput, cInput, dInput, tsInput].forEach((input) => {
+      input.addEventListener("input", update);
+    });
   } else if (block.type === "fileSink") {
     inspectorBody.innerHTML = `
       <label class="param">File path
         <input type="text" data-edit="path" value="${block.params.path}">
       </label>
+      <button class="secondary" data-action="download" ${block.params.lastCsv ? "" : "disabled"}>Download CSV</button>
     `;
     const pathInput = inspectorBody.querySelector("input[data-edit='path']");
+    const downloadBtn = inspectorBody.querySelector("button[data-action='download']");
     pathInput.addEventListener("input", () => {
       block.params.path = pathInput.value;
       renderer.updateBlockLabel(block);
+    });
+    downloadBtn.addEventListener("click", () => {
+      const csv = block.params.lastCsv;
+      if (!csv) return;
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = block.params.path || "output.csv";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     });
   } else {
     inspectorBody.textContent = "No editable parameters for this block.";
@@ -449,6 +609,231 @@ function clearWorkspace() {
   renderer.clearWorkspace();
   statusEl.textContent = "Idle";
   inspectorBody.textContent = "Select a block or wire.";
+}
+
+function serializeDiagram(state) {
+  const blocks = Array.from(state.blocks.values()).map((block) => ({
+    id: block.id,
+    type: block.type,
+    x: Math.round(block.x),
+    y: Math.round(block.y),
+    rotation: block.rotation || 0,
+    params: block.params || {},
+  }));
+  const connections = state.connections.map((conn) => ({
+    from: conn.from,
+    to: conn.to,
+    fromIndex: conn.fromIndex ?? 0,
+    toIndex: conn.toIndex ?? 0,
+  }));
+  return { version: 1, blocks, connections };
+}
+
+function loadDiagram(data) {
+  if (!data || typeof data !== "object") throw new Error("Invalid diagram file");
+  const blocks = Array.isArray(data.blocks) ? data.blocks : [];
+  const connections = Array.isArray(data.connections) ? data.connections : [];
+  renderer.clearWorkspace();
+  state.routingDirty = false;
+  state.dirtyBlocks.clear();
+  state.dirtyConnections.clear();
+
+  blocks.forEach((block) => {
+    if (!block || !block.type) return;
+    renderer.createBlock(block.type, Number(block.x) || 0, Number(block.y) || 0, {
+      id: block.id,
+      rotation: Number(block.rotation) || 0,
+      params: block.params || {},
+    });
+    const created = state.blocks.get(block.id);
+    if (created) renderer.updateBlockLabel(created);
+  });
+
+  connections.forEach((conn) => {
+    if (!conn) return;
+    if (!state.blocks.has(conn.from) || !state.blocks.has(conn.to)) return;
+    renderer.createConnection(conn.from, conn.to, conn.toIndex ?? 0, conn.fromIndex ?? 0);
+  });
+
+  renderer.updateConnections(true);
+}
+
+function toYAML(data) {
+  const lines = [];
+  const write = (value, indent) => {
+    if (Array.isArray(value)) {
+      if (value.length === 0) {
+        lines.push(`${" ".repeat(indent)}[]`);
+        return;
+      }
+      value.forEach((item) => {
+        if (typeof item === "object" && item !== null) {
+          lines.push(`${" ".repeat(indent)}-`);
+          write(item, indent + 2);
+        } else {
+          lines.push(`${" ".repeat(indent)}- ${yamlScalar(item)}`);
+        }
+      });
+      return;
+    }
+    if (typeof value === "object" && value !== null) {
+      const entries = Object.entries(value);
+      if (entries.length === 0) {
+        lines.push(`${" ".repeat(indent)}{}`);
+        return;
+      }
+      entries.forEach(([key, val]) => {
+        if (Array.isArray(val) && val.length === 0) {
+          lines.push(`${" ".repeat(indent)}${key}: []`);
+          return;
+        }
+        if (typeof val === "object" && val !== null) {
+          lines.push(`${" ".repeat(indent)}${key}:`);
+          write(val, indent + 2);
+        } else {
+          lines.push(`${" ".repeat(indent)}${key}: ${yamlScalar(val)}`);
+        }
+      });
+      return;
+    }
+    lines.push(`${" ".repeat(indent)}${yamlScalar(value)}`);
+  };
+  write(data, 0);
+  return lines.join("\n");
+}
+
+function yamlScalar(value) {
+  if (value === null || value === undefined) return "null";
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (Array.isArray(value)) return JSON.stringify(value);
+  const str = String(value);
+  if (/^[A-Za-z0-9_.-]+$/.test(str)) return str;
+  return JSON.stringify(str);
+}
+
+function parseYAML(text) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\t/g, "  "))
+    .filter((line) => line.trim().length > 0 && !line.trim().startsWith("#"))
+    .map((line) => ({
+      indent: line.match(/^ */)[0].length,
+      text: line.trim(),
+    }));
+  let index = 0;
+
+  const parseScalar = (raw) => {
+    if (raw === "null") return null;
+    if (raw === "true") return true;
+    if (raw === "false") return false;
+    if (raw === "[]") return [];
+    if (raw === "{}") return {};
+    if (/^-?\d+(\.\d+)?$/.test(raw)) return Number(raw);
+    if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return raw.slice(1, -1);
+      }
+    }
+    return raw;
+  };
+
+  const nextNonEmpty = (start) => {
+    for (let i = start; i < lines.length; i += 1) {
+      if (lines[i]) return lines[i];
+    }
+    return null;
+  };
+
+  const parseBlock = (indentLevel) => {
+    const current = lines[index];
+    if (!current) return { value: null, next: index };
+    if (current.text.startsWith("- ")) return parseArray(indentLevel);
+    return parseObject(indentLevel);
+  };
+
+  const parseArray = (indentLevel) => {
+    const arr = [];
+    while (index < lines.length) {
+      const line = lines[index];
+      if (line.indent < indentLevel || !line.text.startsWith("- ")) break;
+      const itemText = line.text.slice(2).trim();
+      if (!itemText) {
+        index += 1;
+        const next = nextNonEmpty(index);
+        if (next && next.indent > line.indent) {
+          const parsed = parseBlock(line.indent + 2);
+          arr.push(parsed.value);
+          index = parsed.next;
+        } else {
+          arr.push(null);
+        }
+        continue;
+      }
+      if (itemText.includes(":")) {
+        const [rawKey, ...rest] = itemText.split(":");
+        const key = rawKey.trim();
+        const valueRaw = rest.join(":").trim();
+        const obj = {};
+        if (valueRaw) {
+          obj[key] = parseScalar(valueRaw);
+          index += 1;
+        } else {
+          index += 1;
+          const next = nextNonEmpty(index);
+          if (next && next.indent > line.indent) {
+            const parsed = parseBlock(line.indent + 2);
+            obj[key] = parsed.value;
+            index = parsed.next;
+          } else {
+            obj[key] = null;
+          }
+        }
+        const nextLine = nextNonEmpty(index);
+        if (nextLine && nextLine.indent > line.indent) {
+          const parsed = parseObject(line.indent + 2);
+          Object.assign(obj, parsed.value);
+          index = parsed.next;
+        }
+        arr.push(obj);
+        continue;
+      }
+      arr.push(parseScalar(itemText));
+      index += 1;
+    }
+    return { value: arr, next: index };
+  };
+
+  const parseObject = (indentLevel) => {
+    const obj = {};
+    while (index < lines.length) {
+      const line = lines[index];
+      if (line.indent < indentLevel || line.text.startsWith("- ")) break;
+      const [rawKey, ...rest] = line.text.split(":");
+      const key = rawKey.trim();
+      const valueRaw = rest.join(":").trim();
+      if (!valueRaw) {
+        index += 1;
+        const next = nextNonEmpty(index);
+        if (next && next.indent > line.indent) {
+          const parsed = parseBlock(line.indent + 2);
+          obj[key] = parsed.value;
+          index = parsed.next;
+        } else {
+          obj[key] = null;
+        }
+      } else {
+        obj[key] = parseScalar(valueRaw);
+        index += 1;
+      }
+    }
+    return { value: obj, next: index };
+  };
+
+  const parsed = parseObject(0);
+  return parsed.value;
 }
 
 function init() {
@@ -515,6 +900,42 @@ function init() {
   runBtn.addEventListener("click", () => simulate({ state, runtimeInput, statusEl }));
   clearBtn.addEventListener("click", clearWorkspace);
 
+  if (saveBtn) {
+    saveBtn.addEventListener("click", () => {
+      const yaml = toYAML(serializeDiagram(state));
+      const blob = new Blob([yaml], { type: "text/yaml" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "diagram.yaml";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      statusEl.textContent = "Saved diagram";
+    });
+  }
+
+  if (loadBtn && loadInput) {
+    loadBtn.addEventListener("click", () => loadInput.click());
+    loadInput.addEventListener("change", () => {
+      const file = loadInput.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const text = String(reader.result || "");
+          const data = parseYAML(text);
+          loadDiagram(data);
+          statusEl.textContent = "Loaded diagram";
+        } catch (error) {
+          statusEl.textContent = `Load error: ${error?.message || error}`;
+        }
+      };
+      reader.readAsText(file);
+    });
+  }
+
   deleteSelectionBtn.addEventListener("click", () => {
     if (state.selectedId) {
       renderer.deleteBlock(state.selectedId);
@@ -535,6 +956,9 @@ function init() {
     if (!block) return;
     block.rotation = ((block.rotation || 0) + 90) % 360;
     renderer.updateBlockTransform(block);
+    state.routingDirty = true;
+    if (state.dirtyBlocks) state.dirtyBlocks.add(block.id);
+    state.fastRouting = false;
     renderer.updateConnections(true);
   });
 
