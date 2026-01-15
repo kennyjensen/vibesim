@@ -273,6 +273,16 @@ function renderCenteredAxesPlot(group, width, height, plotPath) {
   });
 }
 
+function renderLabelNode(block, label, { showNode = true } = {}) {
+  const group = block.group;
+  const mathGroup = createSvgElement("g", { class: "label-math", transform: "translate(0,-20)" });
+  group.appendChild(mathGroup);
+  renderTeXMath(mathGroup, label || "", block.width, block.height);
+  if (showNode) {
+    group.appendChild(createSvgElement("circle", { cx: 20, cy: 20, r: 5, class: "label-node" }));
+  }
+}
+
 export function buildFallbackPath(fromPos, toPos) {
   if (!fromPos || !toPos) return [];
   if (fromPos.x === toPos.x || fromPos.y === toPos.y) {
@@ -800,6 +810,17 @@ const blockTemplates = {
       );
     },
   },
+  labelSource: {
+    width: 40,
+    height: 40,
+    inputs: [],
+    outputs: [{ x: 40, y: 20, side: "right" }],
+    defaultParams: { name: "x" },
+    render: (block) => {
+      renderLabelNode(block, block.params.name);
+      block.group.appendChild(createSvgElement("line", { x1: 25, y1: 20, x2: 40, y2: 20, class: "label-node" }));
+    },
+  },
   sum: {
     width: 40,
     height: 40,
@@ -1289,6 +1310,20 @@ const blockTemplates = {
       );
     },
   },
+  labelSink: {
+    width: 40,
+    height: 40,
+    inputs: [{ x: 0, y: 20, side: "left" }],
+    outputs: [],
+    defaultParams: { name: "x", showNode: true },
+    render: (block) => {
+      const showNode = block.params.showNode !== false;
+      renderLabelNode(block, block.params.name, { showNode });
+      if (showNode) {
+        block.group.appendChild(createSvgElement("line", { x1: 15, y1: 20, x2: 0, y2: 20, class: "label-node" }));
+      }
+    },
+  },
 };
 
 export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state, onSelectBlock, onSelectConnection }) {
@@ -1678,12 +1713,16 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     if (state.connections.some((c) => c.from === fromId && c.to === toId && c.toIndex === toIndex && c.fromIndex === fromIndex)) return;
 
     const path = createSvgElement("path", { class: "wire", "marker-end": "url(#wire-arrow)" });
+    const hitPath = createSvgElement("path", { class: "wire-hit" });
+    wireLayer.appendChild(hitPath);
     wireLayer.appendChild(path);
-    const conn = { from: fromId, to: toId, toIndex, fromIndex, path, points: [] };
-    path.addEventListener("click", (event) => {
+    const conn = { from: fromId, to: toId, toIndex, fromIndex, path, hitPath, points: [] };
+    const onSelect = (event) => {
       event.stopPropagation();
       selectConnection(conn);
-    });
+    };
+    path.addEventListener("click", onSelect);
+    hitPath.addEventListener("click", onSelect);
     state.connections.push(conn);
     state.routingDirty = true;
     if (state.dirtyConnections) state.dirtyConnections.add(conn);
@@ -1748,6 +1787,12 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
       if (!points || points.length < 2) {
         points = buildFallbackPathFromPorts(conn);
       }
+      const toBlock = state.blocks.get(conn.to);
+      if (toBlock?.type === "labelSink") {
+        conn.path.removeAttribute("marker-end");
+      } else {
+        conn.path.setAttribute("marker-end", "url(#wire-arrow)");
+      }
       const renderPoints = state.fastRouting ? buildDragRenderPoints(conn, points) : points;
       const segments = buildSegments(renderPoints, conn);
       segmentMap.set(conn, segments);
@@ -1761,12 +1806,14 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
       const renderPoints = state.fastRouting ? buildDragRenderPoints(conn, points) : points;
       if (!renderPoints.length) {
         conn.path.setAttribute("d", "");
+        if (conn.hitPath) conn.hitPath.setAttribute("d", "");
         return;
       }
       const segments = segmentMap.get(conn) || [];
       const otherSegments = priorSegments.slice();
       const d = buildPathWithHops(segments, otherSegments);
       conn.path.setAttribute("d", d);
+      if (conn.hitPath) conn.hitPath.setAttribute("d", d);
       segments.forEach((seg) => {
         if (!seg.isStub) priorSegments.push(seg);
       });
@@ -2375,6 +2422,7 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     const idx = state.connections.indexOf(conn);
     if (idx >= 0) {
       state.connections[idx].path.remove();
+      state.connections[idx].hitPath?.remove();
       state.connections.splice(idx, 1);
     }
     state.routingDirty = true;
@@ -2426,6 +2474,17 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     if (block.type === "delay") {
       const mathGroup = block.group.querySelector(".delay-math");
       if (mathGroup) renderTeXMath(mathGroup, "e^{-sT}", block.width, block.height);
+    }
+    if (block.type === "labelSource" || block.type === "labelSink") {
+      const mathGroup = block.group.querySelector(".label-math");
+      if (mathGroup) renderTeXMath(mathGroup, block.params.name || "", block.width, block.height);
+      if (block.type === "labelSink") {
+        const showNode = block.params.showNode !== false;
+        const circle = block.group.querySelector("circle.label-node");
+        const line = block.group.querySelector("line.label-node");
+        if (circle) circle.style.display = showNode ? "block" : "none";
+        if (line) line.style.display = showNode ? "block" : "none";
+      }
     }
     if (block.type === "pid") {
       const mathGroup = block.group.querySelector(".pid-math");

@@ -42,6 +42,7 @@ export function simulate({ state, runtimeInput, statusEl }) {
   const fileSinkSeries = new Map();
   const stateSpaceState = new Map();
   const dstateSpaceState = new Map();
+  const labelSinks = new Map();
 
   scopes.forEach((scope) => {
     scopeSeries.set(scope.id, Array(scope.inputs).fill(0).map(() => []));
@@ -50,6 +51,10 @@ export function simulate({ state, runtimeInput, statusEl }) {
   });
 
   blocks.forEach((block) => {
+    if (block.type === "labelSink") {
+      const name = String(block.params.name || "").trim();
+      if (name) labelSinks.set(name, block.id);
+    }
     if (block.type === "rate") block.rateState = 0;
     if (block.type === "tf") {
       const model = buildTfModel(block.params.num, block.params.den);
@@ -186,12 +191,45 @@ export function simulate({ state, runtimeInput, statusEl }) {
       }
     });
 
+    const resolveLabelSources = () => {
+      let changed = false;
+      blocks.forEach((block) => {
+        if (block.type !== "labelSource") return;
+        if (outputs.has(block.id)) return;
+        const name = String(block.params.name || "").trim();
+        if (!name) {
+          outputs.set(block.id, 0);
+          changed = true;
+          return;
+        }
+        const sinkId = labelSinks.get(name);
+        if (!sinkId) {
+          outputs.set(block.id, 0);
+          changed = true;
+          return;
+        }
+        const sinkInputs = inputMap.get(sinkId) || [];
+        const fromId = sinkInputs[0];
+        if (!fromId) {
+          outputs.set(block.id, 0);
+          changed = true;
+          return;
+        }
+        if (!outputs.has(fromId)) return;
+        const value = outputs.get(fromId);
+        outputs.set(block.id, value ?? 0);
+        changed = true;
+      });
+      return changed;
+    };
+
     let progress = true;
     while (progress) {
       progress = false;
+      if (resolveLabelSources()) progress = true;
       blocks.forEach((block) => {
         if (outputs.has(block.id)) return;
-        if (["scope", "integrator", "tf", "delay", "ddelay", "stateSpace", "dstateSpace", "lpf", "hpf", "derivative", "pid", "zoh", "foh", "dtf", "backlash", "fileSink"].includes(block.type)) return;
+        if (["scope", "integrator", "tf", "delay", "ddelay", "stateSpace", "dstateSpace", "lpf", "hpf", "derivative", "pid", "zoh", "foh", "dtf", "backlash", "fileSink", "labelSink", "labelSource"].includes(block.type)) return;
 
         const inputs = inputMap.get(block.id) || [];
         const values = inputs.map((fromId) => (fromId ? outputs.get(fromId) : undefined));
@@ -216,6 +254,7 @@ export function simulate({ state, runtimeInput, statusEl }) {
         outputs.set(block.id, out);
         progress = true;
       });
+      if (resolveLabelSources()) progress = true;
     }
 
     scopes.forEach((scope) => {

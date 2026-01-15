@@ -45,6 +45,7 @@
         <button class="tool" data-type="chirp">Chirp</button>
         <button class="tool" data-type="noise">Noise</button>
         <button class="tool" data-type="fileSource">File</button>
+        <button class="tool" data-type="labelSource">Label</button>
       </details>
       <details class="tool-group" open>
         <summary>Continuous</summary>
@@ -81,6 +82,7 @@
         <summary>Sink</summary>
         <button class="tool" data-type="scope">Scope</button>
         <button class="tool" data-type="fileSink">Output File</button>
+        <button class="tool" data-type="labelSink">Label</button>
       </details>
       <div id="inspector" class="inspector">
         <h3>Properties</h3>
@@ -97,14 +99,42 @@
 
     <section class="workspace">
       <div id="canvas">
-        <button id="fullRouteBtn" class="floating-btn" aria-label="Full reroute">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M6 6v4h4M18 18v-4h-4M7 17a7 7 0 0 0 10 0M17 7a7 7 0 0 0-10 0" />
-          </svg>
-        </button>
+        <div class="floating-controls">
+          <button id="fullRouteBtn" class="floating-btn" aria-label="Full reroute" title="Full reroute">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="2.5" y="4" width="5" height="5" rx="1" />
+              <rect x="16.5" y="10" width="5" height="5" rx="1" />
+              <rect x="2.5" y="16" width="5" height="5" rx="1" />
+              <path d="M7.5 6.5H13M13 6.5V12.5H16.5M7.5 18H13M13 18V12.5" />
+            </svg>
+          </button>
+          <button id="homeBtn" class="floating-btn" aria-label="Home" title="Home">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 11l8-6 8 6M6 10v9h12v-9" />
+            </svg>
+          </button>
+          <button id="zoomInBtn" class="floating-btn" aria-label="Zoom in" title="Zoom in">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M11 8v6M8 11h6M16.5 16.5L21 21" />
+            </svg>
+          </button>
+          <button id="zoomOutBtn" class="floating-btn" aria-label="Zoom out" title="Zoom out">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M8 11h6M16.5 16.5L21 21" />
+            </svg>
+          </button>
+          <button id="printBtn" class="floating-btn" aria-label="Print" title="Print">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 7V4h10v3M7 17h10v3H7z" />
+              <rect x="4" y="9" width="16" height="6" rx="1" />
+            </svg>
+          </button>
+        </div>
         <svg id="svgCanvas">
-          <g id="blockLayer"></g>
           <g id="wireLayer"></g>
+          <g id="blockLayer"></g>
           <g id="overlayLayer"></g>
         </svg>
       </div>

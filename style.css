@@ -224,10 +224,16 @@ body {
   overflow: hidden;
 }
 
-.floating-btn {
+.floating-controls {
   position: absolute;
   top: 14px;
   right: 14px;
+  display: flex;
+  gap: 10px;
+  z-index: 5;
+}
+
+.floating-btn {
   width: 40px;
   height: 40px;
   display: grid;
@@ -236,9 +242,9 @@ body {
   border: 2px solid #3c3c3c;
   border-radius: 8px;
   cursor: pointer;
-  z-index: 5;
   box-shadow: 0 4px 0 #3c3c3c;
 }
+
 
 .floating-btn:active {
   transform: translateY(2px);
@@ -312,6 +318,17 @@ body {
 .delay-math .math-foreign,
 .delay-math .math-foreign mjx-container {
   font-size: 28px;
+}
+
+.label-math .math-foreign,
+.label-math .math-foreign mjx-container {
+  font-size: 16px;
+}
+
+.label-node {
+  fill: none;
+  stroke: #3c3c3c;
+  stroke-width: 2;
 }
 
 .pid-math .math-foreign,
@@ -419,7 +436,7 @@ body {
 
 .wire {
   stroke: var(--wire);
-  stroke-width: 3;
+  stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
   color: var(--wire);
@@ -427,15 +444,22 @@ body {
   pointer-events: stroke;
 }
 
+.wire-hit {
+  stroke: transparent;
+  stroke-width: 12;
+  fill: none;
+  pointer-events: stroke;
+}
+
 .wire.selected {
   stroke: #d17a3a;
-  stroke-width: 4;
+  stroke-width: 2;
   color: #d17a3a;
 }
 
 .wire.wire-error {
   stroke: #dc2626;
-  stroke-width: 4;
+  stroke-width: 2;
   color: #dc2626;
 }
 

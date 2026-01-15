@@ -239,6 +239,25 @@ function renderInspector(block) {
       block.params.amp = Number(ampInput.value);
       renderer.updateBlockLabel(block);
     });
+  } else if (block.type === "labelSource" || block.type === "labelSink") {
+    inspectorBody.innerHTML = `
+      <label class="param">Label name
+        <input type="text" data-edit="name" value="${block.params.name || ""}">
+      </label>
+      ${block.type === "labelSink" ? `<label class="param"><input type="checkbox" data-edit="showNode" ${block.params.showNode !== false ? "checked" : ""}> Show node</label>` : ""}
+    `;
+    const nameInput = inspectorBody.querySelector("input[data-edit='name']");
+    nameInput.addEventListener("input", () => {
+      block.params.name = nameInput.value.trim();
+      renderer.updateBlockLabel(block);
+    });
+    const showNodeInput = inspectorBody.querySelector("input[data-edit='showNode']");
+    if (showNodeInput) {
+      showNodeInput.addEventListener("change", () => {
+        block.params.showNode = showNodeInput.checked;
+        renderer.updateBlockLabel(block);
+      });
+    }
   } else if (block.type === "delay") {
     inspectorBody.innerHTML = `
       <label class="param">Delay (s)
@@ -876,6 +895,169 @@ function init() {
     updateGrid(canvas, scale, viewBox);
   };
 
+  const fitToDiagram = () => {
+    if (state.blocks.size === 0) {
+      initViewBox();
+      return;
+    }
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    state.blocks.forEach((block) => {
+      minX = Math.min(minX, block.x);
+      minY = Math.min(minY, block.y);
+      maxX = Math.max(maxX, block.x + block.width);
+      maxY = Math.max(maxY, block.y + block.height);
+    });
+    const pad = 60;
+    minX -= pad;
+    minY -= pad;
+    maxX += pad;
+    maxY += pad;
+    const boundsW = Math.max(1, maxX - minX);
+    const boundsH = Math.max(1, maxY - minY);
+    const w = svg.clientWidth || 1;
+    const h = svg.clientHeight || 1;
+    const scale = Math.max(0.1, Math.min(3, Math.min(w / boundsW, h / boundsH)));
+    zoomScale = scale;
+    updateViewBox(scale, { x: minX + boundsW / 2, y: minY + boundsH / 2 });
+  };
+
+  const exportSvg = async () => {
+    const clone = svg.cloneNode(true);
+    clone.removeAttribute("width");
+    clone.removeAttribute("height");
+    clone.setAttribute("viewBox", `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`);
+    const cssText = await fetch("style.css", { cache: "no-store" }).then((res) => res.text()).catch(() => "");
+    if (cssText) {
+      const style = document.createElement("style");
+      style.textContent = cssText;
+      clone.insertBefore(style, clone.firstChild);
+    }
+    return new XMLSerializer().serializeToString(clone);
+  };
+
+  const renderSvgToCanvas = async () => {
+    const svgText = await exportSvg();
+    const blob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = 2;
+        const canvas = document.createElement("canvas");
+        canvas.width = viewBox.w * scale;
+        canvas.height = viewBox.h * scale;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          URL.revokeObjectURL(url);
+          reject(new Error("No canvas context"));
+          return;
+        }
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        resolve({ canvas, width: canvas.width, height: canvas.height });
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error("Failed to render SVG"));
+      };
+      img.src = url;
+    });
+  };
+
+  const downloadPdf = async () => {
+    const { canvas, width, height } = await renderSvgToCanvas();
+    const jpgDataUrl = canvas.toDataURL("image/jpeg", 0.92);
+    const base64 = jpgDataUrl.split(",")[1] || "";
+    const binary = atob(base64);
+    const imgBytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) imgBytes[i] = binary.charCodeAt(i);
+
+    const parts = [];
+    const encoder = new TextEncoder();
+    const offsets = [];
+    let offset = 0;
+
+    const push = (data) => {
+      parts.push(data);
+      offset += data.length;
+    };
+    const pushStr = (str) => push(encoder.encode(str));
+
+    const objects = [];
+    const addObject = (body) => {
+      objects.push({ body });
+    };
+
+    addObject("<< /Type /Catalog /Pages 2 0 R >>");
+    addObject("<< /Type /Pages /Kids [3 0 R] /Count 1 >>");
+    addObject(
+      `<< /Type /Page /Parent 2 0 R /Resources << /XObject << /Im0 4 0 R >> >> /MediaBox [0 0 ${width} ${height}] /Contents 5 0 R >>`
+    );
+    addObject(
+      `<< /Type /XObject /Subtype /Image /Width ${width} /Height ${height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${imgBytes.length} >>`
+    );
+    const contentStream = `q ${width} 0 0 ${height} 0 0 cm /Im0 Do Q`;
+    addObject(`<< /Length ${contentStream.length} >>`);
+
+    pushStr("%PDF-1.4\n");
+    objects.forEach((obj, idx) => {
+      offsets[idx + 1] = offset;
+      pushStr(`${idx + 1} 0 obj\n`);
+      pushStr(obj.body);
+      pushStr("\n");
+      if (idx === 3) {
+        pushStr("stream\n");
+        push(imgBytes);
+        pushStr("\nendstream\nendobj\n");
+      } else if (idx === 4) {
+        pushStr("stream\n");
+        pushStr(contentStream);
+        pushStr("\nendstream\nendobj\n");
+      } else {
+        pushStr("endobj\n");
+      }
+    });
+    const xrefOffset = offset;
+    pushStr("xref\n");
+    pushStr(`0 ${objects.length + 1}\n`);
+    pushStr("0000000000 65535 f \n");
+    for (let i = 1; i <= objects.length; i += 1) {
+      const off = String(offsets[i]).padStart(10, "0");
+      pushStr(`${off} 00000 n \n`);
+    }
+    pushStr("trailer\n");
+    pushStr(`<< /Size ${objects.length + 1} /Root 1 0 R >>\n`);
+    pushStr("startxref\n");
+    pushStr(`${xrefOffset}\n%%EOF`);
+
+    const pdfBlob = new Blob(parts, { type: "application/pdf" });
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    const link = document.createElement("a");
+    link.href = pdfUrl;
+    link.download = "vibesim.pdf";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(pdfUrl), 10000);
+  };
+
+  const printWorkspace = async () => {
+    const svgText = await exportSvg();
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(
+      `<html><head><title>Vibesim</title><style>body{margin:0;}</style></head><body>${svgText}</body></html>`
+    );
+    win.document.close();
+    win.focus();
+    win.print();
+  };
+
   initViewBox();
 
   document.querySelectorAll(".tool").forEach((button) => {
@@ -961,6 +1143,32 @@ function init() {
     state.fastRouting = false;
     renderer.updateConnections(true);
   });
+
+  const homeBtn = document.getElementById("homeBtn");
+  const zoomInBtn = document.getElementById("zoomInBtn");
+  const zoomOutBtn = document.getElementById("zoomOutBtn");
+  const printBtn = document.getElementById("printBtn");
+
+  if (homeBtn) homeBtn.addEventListener("click", fitToDiagram);
+  if (zoomInBtn) {
+    zoomInBtn.addEventListener("click", () => {
+      zoomScale = Math.max(0.1, Math.min(3, zoomScale * 1.1));
+      const center = { x: viewBox.x + viewBox.w / 2, y: viewBox.y + viewBox.h / 2 };
+      updateViewBox(zoomScale, center);
+    });
+  }
+  if (zoomOutBtn) {
+    zoomOutBtn.addEventListener("click", () => {
+      zoomScale = Math.max(0.1, Math.min(3, zoomScale / 1.1));
+      const center = { x: viewBox.x + viewBox.w / 2, y: viewBox.y + viewBox.h / 2 };
+      updateViewBox(zoomScale, center);
+    });
+  }
+  if (printBtn) {
+    printBtn.addEventListener("click", () => {
+      downloadPdf();
+    });
+  }
 
   svg.addEventListener(
     "wheel",
