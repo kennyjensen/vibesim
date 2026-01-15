@@ -966,6 +966,24 @@ function init() {
     updateGrid(canvas, scale, viewBox);
   };
 
+  const updateViewBoxWithAnchor = (scale, anchor, baseViewBox = viewBox) => {
+    const w = svg.clientWidth || 1;
+    const h = svg.clientHeight || 1;
+    const newW = w / scale;
+    const newH = h / scale;
+    const relX = (anchor.x - baseViewBox.x) / baseViewBox.w;
+    const relY = (anchor.y - baseViewBox.y) / baseViewBox.h;
+    viewBox = {
+      x: anchor.x - relX * newW,
+      y: anchor.y - relY * newH,
+      w: newW,
+      h: newH,
+    };
+    svg.setAttribute("viewBox", `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`);
+    const canvas = document.getElementById("canvas");
+    updateGrid(canvas, scale, viewBox);
+  };
+
   const fitToDiagram = () => {
     if (state.blocks.size === 0) {
       initViewBox();
@@ -1250,11 +1268,12 @@ function init() {
     "wheel",
     (event) => {
       event.preventDefault();
+      const baseViewBox = { ...viewBox };
       const delta = Math.sign(event.deltaY);
       const factor = delta > 0 ? 0.9 : 1.1;
       zoomScale = Math.max(0.1, Math.min(3, zoomScale * factor));
-      const center = renderer.clientToSvg(event.clientX, event.clientY);
-      updateViewBox(zoomScale, center);
+      const anchor = renderer.clientToSvg(event.clientX, event.clientY);
+      updateViewBoxWithAnchor(zoomScale, anchor, baseViewBox);
     },
     { passive: false }
   );
