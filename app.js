@@ -22,7 +22,9 @@ if (rotateSelectionBtn) rotateSelectionBtn.disabled = true;
 
 window.addEventListener("error", (event) => {
   const message = event?.message || "Unknown error";
-  if (statusEl) statusEl.textContent = `Error: ${message}`;
+  const file = event?.filename ? event.filename.split("/").pop() : "";
+  const line = event?.lineno ? `:${event.lineno}` : "";
+  if (statusEl) statusEl.textContent = `Error: ${message}${file ? ` (${file}${line})` : ""}`;
 });
 window.addEventListener("unhandledrejection", (event) => {
   const reason = event?.reason?.message || event?.reason || "Unhandled rejection";
@@ -44,6 +46,9 @@ const state = {
   fastRouting: false,
   dirtyBlocks: new Set(),
   dirtyConnections: new Set(),
+  variables: {},
+  variablesText: "",
+  variablesDisplay: [],
 };
 
 const renderer = createRenderer({
@@ -82,6 +87,57 @@ function updateGrid(canvas, scale, viewBox) {
   canvas.style.setProperty("--grid-offset-y", `${offsetY}px`);
 }
 
+const normalizeVarName = (name) => {
+  if (!name) return "";
+  const trimmed = String(name).trim();
+  if (trimmed.startsWith("\\")) return trimmed.slice(1);
+  return trimmed;
+};
+
+const replaceLatexVars = (expr) =>
+  String(expr || "").replace(/\\[A-Za-z]+/g, (match) => match.slice(1));
+
+const evalExpression = (expr, vars) => {
+  if (typeof expr === "number") return expr;
+  if (expr == null) return NaN;
+  const trimmed = replaceLatexVars(expr).trim();
+  if (!trimmed) return NaN;
+  const num = Number(trimmed);
+  if (Number.isFinite(num)) return num;
+  try {
+    const names = Object.keys(vars);
+    const values = Object.values(vars);
+    const fn = Function(...names, "Math", `"use strict"; return (${trimmed});`);
+    const result = fn(...values, Math);
+    return Number.isFinite(result) ? result : NaN;
+  } catch {
+    return NaN;
+  }
+};
+
+const parseVariables = (text) => {
+  const vars = { pi: Math.PI, e: Math.E };
+  const display = [];
+  const lines = String(text || "").split(/\r?\n/);
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) return;
+    const idx = trimmed.indexOf("=");
+    if (idx < 0) return;
+    const name = trimmed.slice(0, idx).trim();
+    const expr = trimmed.slice(idx + 1).trim();
+    if (!name) return;
+    const key = normalizeVarName(name);
+    if (!key) return;
+    const value = evalExpression(expr, vars);
+    if (Number.isFinite(value)) {
+      vars[key] = value;
+      display.push(`${name}=${value}`);
+    }
+  });
+  return { vars, display };
+};
+
 function renderInspector(block) {
   if (!block) {
     inspectorBody.textContent = "Select a block or wire.";
@@ -103,109 +159,113 @@ function renderInspector(block) {
   const parseList = (value) =>
     value
       .split(",")
-      .map((v) => Number(v.trim()))
-      .filter((v) => Number.isFinite(v));
+      .map((v) => v.trim())
+      .filter((v) => v.length)
+      .map((v) => {
+        const num = Number(v);
+        return Number.isFinite(num) ? num : v;
+      });
 
   if (block.type === "constant") {
     inspectorBody.innerHTML = `
       <label class="param">Value
-        <input type="number" data-edit="value" value="${block.params.value}" step="0.1">
+        <input type="text" data-edit="value" value="${block.params.value}" step="0.1">
       </label>
     `;
     const input = inspectorBody.querySelector("input[data-edit='value']");
     input.addEventListener("input", () => {
-      block.params.value = Number(input.value);
+      block.params.value = input.value;
       renderer.updateBlockLabel(block);
     });
   } else if (block.type === "step") {
     inspectorBody.innerHTML = `
       <label class="param">Step time (s)
-        <input type="number" data-edit="stepTime" value="${block.params.stepTime}" step="0.1">
+        <input type="text" data-edit="stepTime" value="${block.params.stepTime}" step="0.1">
       </label>
     `;
     const input = inspectorBody.querySelector("input[data-edit='stepTime']");
     input.addEventListener("input", () => {
-      block.params.stepTime = Number(input.value);
+      block.params.stepTime = input.value;
       renderer.updateBlockLabel(block);
     });
   } else if (block.type === "ramp") {
     inspectorBody.innerHTML = `
       <label class="param">Slope
-        <input type="number" data-edit="slope" value="${block.params.slope}" step="0.1">
+        <input type="text" data-edit="slope" value="${block.params.slope}" step="0.1">
       </label>
       <label class="param">Start time (s)
-        <input type="number" data-edit="start" value="${block.params.start}" step="0.1">
+        <input type="text" data-edit="start" value="${block.params.start}" step="0.1">
       </label>
     `;
     const slopeInput = inspectorBody.querySelector("input[data-edit='slope']");
     const startInput = inspectorBody.querySelector("input[data-edit='start']");
     slopeInput.addEventListener("input", () => {
-      block.params.slope = Number(slopeInput.value);
+      block.params.slope = slopeInput.value;
       renderer.updateBlockLabel(block);
     });
     startInput.addEventListener("input", () => {
-      block.params.start = Number(startInput.value);
+      block.params.start = startInput.value;
       renderer.updateBlockLabel(block);
     });
   } else if (block.type === "impulse") {
     inspectorBody.innerHTML = `
       <label class="param">Time (s)
-        <input type="number" data-edit="time" value="${block.params.time}" step="0.1">
+        <input type="text" data-edit="time" value="${block.params.time}" step="0.1">
       </label>
       <label class="param">Amplitude
-        <input type="number" data-edit="amp" value="${block.params.amp}" step="0.1">
+        <input type="text" data-edit="amp" value="${block.params.amp}" step="0.1">
       </label>
     `;
     const timeInput = inspectorBody.querySelector("input[data-edit='time']");
     const ampInput = inspectorBody.querySelector("input[data-edit='amp']");
     timeInput.addEventListener("input", () => {
-      block.params.time = Number(timeInput.value);
+      block.params.time = timeInput.value;
       renderer.updateBlockLabel(block);
     });
     ampInput.addEventListener("input", () => {
-      block.params.amp = Number(ampInput.value);
+      block.params.amp = ampInput.value;
       renderer.updateBlockLabel(block);
     });
   } else if (block.type === "sine") {
     inspectorBody.innerHTML = `
       <label class="param">Amplitude
-        <input type="number" data-edit="amp" value="${block.params.amp}" step="0.1">
+        <input type="text" data-edit="amp" value="${block.params.amp}" step="0.1">
       </label>
       <label class="param">Frequency (Hz)
-        <input type="number" data-edit="freq" value="${block.params.freq}" step="0.1">
+        <input type="text" data-edit="freq" value="${block.params.freq}" step="0.1">
       </label>
       <label class="param">Phase (rad)
-        <input type="number" data-edit="phase" value="${block.params.phase}" step="0.1">
+        <input type="text" data-edit="phase" value="${block.params.phase}" step="0.1">
       </label>
     `;
     const ampInput = inspectorBody.querySelector("input[data-edit='amp']");
     const freqInput = inspectorBody.querySelector("input[data-edit='freq']");
     const phaseInput = inspectorBody.querySelector("input[data-edit='phase']");
     ampInput.addEventListener("input", () => {
-      block.params.amp = Number(ampInput.value);
+      block.params.amp = ampInput.value;
       renderer.updateBlockLabel(block);
     });
     freqInput.addEventListener("input", () => {
-      block.params.freq = Number(freqInput.value);
+      block.params.freq = freqInput.value;
       renderer.updateBlockLabel(block);
     });
     phaseInput.addEventListener("input", () => {
-      block.params.phase = Number(phaseInput.value);
+      block.params.phase = phaseInput.value;
       renderer.updateBlockLabel(block);
     });
   } else if (block.type === "chirp") {
     inspectorBody.innerHTML = `
       <label class="param">Amplitude
-        <input type="number" data-edit="amp" value="${block.params.amp}" step="0.1">
+        <input type="text" data-edit="amp" value="${block.params.amp}" step="0.1">
       </label>
       <label class="param">Start freq (Hz)
-        <input type="number" data-edit="f0" value="${block.params.f0}" step="0.1">
+        <input type="text" data-edit="f0" value="${block.params.f0}" step="0.1">
       </label>
       <label class="param">End freq (Hz)
-        <input type="number" data-edit="f1" value="${block.params.f1}" step="0.1">
+        <input type="text" data-edit="f1" value="${block.params.f1}" step="0.1">
       </label>
       <label class="param">Duration (s)
-        <input type="number" data-edit="t1" value="${block.params.t1}" step="0.1">
+        <input type="text" data-edit="t1" value="${block.params.t1}" step="0.1">
       </label>
     `;
     const ampInput = inspectorBody.querySelector("input[data-edit='amp']");
@@ -213,30 +273,30 @@ function renderInspector(block) {
     const f1Input = inspectorBody.querySelector("input[data-edit='f1']");
     const t1Input = inspectorBody.querySelector("input[data-edit='t1']");
     ampInput.addEventListener("input", () => {
-      block.params.amp = Number(ampInput.value);
+      block.params.amp = ampInput.value;
       renderer.updateBlockLabel(block);
     });
     f0Input.addEventListener("input", () => {
-      block.params.f0 = Number(f0Input.value);
+      block.params.f0 = f0Input.value;
       renderer.updateBlockLabel(block);
     });
     f1Input.addEventListener("input", () => {
-      block.params.f1 = Number(f1Input.value);
+      block.params.f1 = f1Input.value;
       renderer.updateBlockLabel(block);
     });
     t1Input.addEventListener("input", () => {
-      block.params.t1 = Number(t1Input.value);
+      block.params.t1 = t1Input.value;
       renderer.updateBlockLabel(block);
     });
   } else if (block.type === "noise") {
     inspectorBody.innerHTML = `
       <label class="param">Amplitude
-        <input type="number" data-edit="amp" value="${block.params.amp}" step="0.1">
+        <input type="text" data-edit="amp" value="${block.params.amp}" step="0.1">
       </label>
     `;
     const ampInput = inspectorBody.querySelector("input[data-edit='amp']");
     ampInput.addEventListener("input", () => {
-      block.params.amp = Number(ampInput.value);
+      block.params.amp = ampInput.value;
       renderer.updateBlockLabel(block);
     });
   } else if (block.type === "labelSource" || block.type === "labelSink") {
@@ -261,27 +321,27 @@ function renderInspector(block) {
   } else if (block.type === "delay") {
     inspectorBody.innerHTML = `
       <label class="param">Delay (s)
-        <input type="number" data-edit="delay" value="${block.params.delay}" step="0.1" min="0">
+        <input type="text" data-edit="delay" value="${block.params.delay}" step="0.1" min="0">
       </label>
     `;
     const input = inspectorBody.querySelector("input[data-edit='delay']");
     input.addEventListener("input", () => {
-      block.params.delay = Math.max(0, Number(input.value));
+      block.params.delay = input.value;
       renderer.updateBlockLabel(block);
     });
   } else if (block.type === "stateSpace") {
     inspectorBody.innerHTML = `
       <label class="param">A
-        <input type="number" data-edit="A" value="${block.params.A}" step="0.1">
+        <input type="text" data-edit="A" value="${block.params.A}" step="0.1">
       </label>
       <label class="param">B
-        <input type="number" data-edit="B" value="${block.params.B}" step="0.1">
+        <input type="text" data-edit="B" value="${block.params.B}" step="0.1">
       </label>
       <label class="param">C
-        <input type="number" data-edit="C" value="${block.params.C}" step="0.1">
+        <input type="text" data-edit="C" value="${block.params.C}" step="0.1">
       </label>
       <label class="param">D
-        <input type="number" data-edit="D" value="${block.params.D}" step="0.1">
+        <input type="text" data-edit="D" value="${block.params.D}" step="0.1">
       </label>
     `;
     const aInput = inspectorBody.querySelector("input[data-edit='A']");
@@ -289,10 +349,10 @@ function renderInspector(block) {
     const cInput = inspectorBody.querySelector("input[data-edit='C']");
     const dInput = inspectorBody.querySelector("input[data-edit='D']");
     const update = () => {
-      block.params.A = Number(aInput.value);
-      block.params.B = Number(bInput.value);
-      block.params.C = Number(cInput.value);
-      block.params.D = Number(dInput.value);
+      block.params.A = aInput.value;
+      block.params.B = bInput.value;
+      block.params.C = cInput.value;
+      block.params.D = dInput.value;
     };
     [aInput, bInput, cInput, dInput].forEach((input) => {
       input.addEventListener("input", update);
@@ -353,12 +413,12 @@ function renderInspector(block) {
   } else if (block.type === "gain") {
     inspectorBody.innerHTML = `
       <label class="param">Gain
-        <input type="number" data-edit="gain" value="${block.params.gain}" step="0.1">
+        <input type="text" data-edit="gain" value="${block.params.gain}" step="0.1">
       </label>
     `;
     const input = inspectorBody.querySelector("input[data-edit='gain']");
     input.addEventListener("input", () => {
-      block.params.gain = Number(input.value);
+      block.params.gain = input.value;
       renderer.updateBlockLabel(block);
     });
   } else if (block.type === "sum") {
@@ -393,95 +453,95 @@ function renderInspector(block) {
       select.value = String(signs[idx] ?? 1);
       select.addEventListener("change", () => {
         if (!block.params.signs) block.params.signs = [1, 1, 1];
-        block.params.signs[idx] = Number(select.value);
+      block.params.signs[idx] = Number(select.value);
         renderer.updateBlockLabel(block);
       });
     });
   } else if (block.type === "lpf" || block.type === "hpf") {
     inspectorBody.innerHTML = `
       <label class="param">Cutoff (Hz)
-        <input type="number" data-edit="cutoff" value="${block.params.cutoff}" step="0.1">
+        <input type="text" data-edit="cutoff" value="${block.params.cutoff}" step="0.1">
       </label>
     `;
     const input = inspectorBody.querySelector("input[data-edit='cutoff']");
     input.addEventListener("input", () => {
-      block.params.cutoff = Number(input.value);
+      block.params.cutoff = input.value;
       renderer.updateBlockLabel(block);
     });
   } else if (block.type === "pid") {
     inspectorBody.innerHTML = `
       <label class="param">Kp
-        <input type="number" data-edit="kp" value="${block.params.kp}" step="0.1">
+        <input type="text" data-edit="kp" value="${block.params.kp}" step="0.1">
       </label>
       <label class="param">Ki
-        <input type="number" data-edit="ki" value="${block.params.ki}" step="0.1">
+        <input type="text" data-edit="ki" value="${block.params.ki}" step="0.1">
       </label>
       <label class="param">Kd
-        <input type="number" data-edit="kd" value="${block.params.kd}" step="0.1">
+        <input type="text" data-edit="kd" value="${block.params.kd}" step="0.1">
       </label>
     `;
     const kpInput = inspectorBody.querySelector("input[data-edit='kp']");
     const kiInput = inspectorBody.querySelector("input[data-edit='ki']");
     const kdInput = inspectorBody.querySelector("input[data-edit='kd']");
     kpInput.addEventListener("input", () => {
-      block.params.kp = Number(kpInput.value);
+      block.params.kp = kpInput.value;
       renderer.updateBlockLabel(block);
     });
     kiInput.addEventListener("input", () => {
-      block.params.ki = Number(kiInput.value);
+      block.params.ki = kiInput.value;
       renderer.updateBlockLabel(block);
     });
     kdInput.addEventListener("input", () => {
-      block.params.kd = Number(kdInput.value);
+      block.params.kd = kdInput.value;
       renderer.updateBlockLabel(block);
     });
   } else if (block.type === "saturation") {
     inspectorBody.innerHTML = `
       <label class="param">Min
-        <input type="number" data-edit="min" value="${block.params.min}" step="0.1">
+        <input type="text" data-edit="min" value="${block.params.min}" step="0.1">
       </label>
       <label class="param">Max
-        <input type="number" data-edit="max" value="${block.params.max}" step="0.1">
+        <input type="text" data-edit="max" value="${block.params.max}" step="0.1">
       </label>
     `;
     const minInput = inspectorBody.querySelector("input[data-edit='min']");
     const maxInput = inspectorBody.querySelector("input[data-edit='max']");
     minInput.addEventListener("input", () => {
-      block.params.min = Number(minInput.value);
+      block.params.min = minInput.value;
       renderer.updateBlockLabel(block);
     });
     maxInput.addEventListener("input", () => {
-      block.params.max = Number(maxInput.value);
+      block.params.max = maxInput.value;
       renderer.updateBlockLabel(block);
     });
   } else if (block.type === "rate") {
     inspectorBody.innerHTML = `
       <label class="param">Rise limit
-        <input type="number" data-edit="rise" value="${block.params.rise}" step="0.1">
+        <input type="text" data-edit="rise" value="${block.params.rise}" step="0.1">
       </label>
       <label class="param">Fall limit
-        <input type="number" data-edit="fall" value="${block.params.fall}" step="0.1">
+        <input type="text" data-edit="fall" value="${block.params.fall}" step="0.1">
       </label>
     `;
     const riseInput = inspectorBody.querySelector("input[data-edit='rise']");
     const fallInput = inspectorBody.querySelector("input[data-edit='fall']");
     riseInput.addEventListener("input", () => {
-      block.params.rise = Number(riseInput.value);
+      block.params.rise = riseInput.value;
       renderer.updateBlockLabel(block);
     });
     fallInput.addEventListener("input", () => {
-      block.params.fall = Number(fallInput.value);
+      block.params.fall = fallInput.value;
       renderer.updateBlockLabel(block);
     });
   } else if (block.type === "backlash") {
     inspectorBody.innerHTML = `
       <label class="param">Width
-        <input type="number" data-edit="width" value="${block.params.width}" step="0.1">
+        <input type="text" data-edit="width" value="${block.params.width}" step="0.1">
       </label>
     `;
     const input = inspectorBody.querySelector("input[data-edit='width']");
     input.addEventListener("input", () => {
-      block.params.width = Number(input.value);
+      block.params.width = input.value;
       renderer.updateBlockLabel(block);
     });
   } else if (block.type === "tf") {
@@ -506,12 +566,12 @@ function renderInspector(block) {
   } else if (block.type === "zoh" || block.type === "foh") {
     inspectorBody.innerHTML = `
       <label class="param">Sample time (s)
-        <input type="number" data-edit="ts" value="${block.params.ts}" step="0.01">
+        <input type="text" data-edit="ts" value="${block.params.ts}" step="0.01">
       </label>
     `;
     const input = inspectorBody.querySelector("input[data-edit='ts']");
     input.addEventListener("input", () => {
-      block.params.ts = Number(input.value);
+      block.params.ts = input.value;
       renderer.updateBlockLabel(block);
     });
   } else if (block.type === "dtf") {
@@ -523,7 +583,7 @@ function renderInspector(block) {
         <input type="text" data-edit="den" value="${block.params.den.join(",")}">
       </label>
       <label class="param">Sample time (s)
-        <input type="number" data-edit="ts" value="${block.params.ts}" step="0.01">
+        <input type="text" data-edit="ts" value="${block.params.ts}" step="0.01">
       </label>
     `;
     const numInput = inspectorBody.querySelector("input[data-edit='num']");
@@ -538,44 +598,44 @@ function renderInspector(block) {
       renderer.updateBlockLabel(block);
     });
     tsInput.addEventListener("input", () => {
-      block.params.ts = Number(tsInput.value);
+      block.params.ts = tsInput.value;
       renderer.updateBlockLabel(block);
     });
   } else if (block.type === "ddelay") {
     inspectorBody.innerHTML = `
       <label class="param">Steps
-        <input type="number" data-edit="steps" value="${block.params.steps}" step="1" min="1">
+        <input type="text" data-edit="steps" value="${block.params.steps}" step="1" min="1">
       </label>
       <label class="param">Sample time (s)
-        <input type="number" data-edit="ts" value="${block.params.ts}" step="0.01" min="0.001">
+        <input type="text" data-edit="ts" value="${block.params.ts}" step="0.01" min="0.001">
       </label>
     `;
     const stepsInput = inspectorBody.querySelector("input[data-edit='steps']");
     const tsInput = inspectorBody.querySelector("input[data-edit='ts']");
     stepsInput.addEventListener("input", () => {
-      block.params.steps = Math.max(1, Math.round(Number(stepsInput.value) || 1));
+      block.params.steps = stepsInput.value;
       renderer.updateBlockLabel(block);
     });
     tsInput.addEventListener("input", () => {
-      block.params.ts = Math.max(0.001, Number(tsInput.value));
+      block.params.ts = tsInput.value;
       renderer.updateBlockLabel(block);
     });
   } else if (block.type === "dstateSpace") {
     inspectorBody.innerHTML = `
       <label class="param">A
-        <input type="number" data-edit="A" value="${block.params.A}" step="0.1">
+        <input type="text" data-edit="A" value="${block.params.A}" step="0.1">
       </label>
       <label class="param">B
-        <input type="number" data-edit="B" value="${block.params.B}" step="0.1">
+        <input type="text" data-edit="B" value="${block.params.B}" step="0.1">
       </label>
       <label class="param">C
-        <input type="number" data-edit="C" value="${block.params.C}" step="0.1">
+        <input type="text" data-edit="C" value="${block.params.C}" step="0.1">
       </label>
       <label class="param">D
-        <input type="number" data-edit="D" value="${block.params.D}" step="0.1">
+        <input type="text" data-edit="D" value="${block.params.D}" step="0.1">
       </label>
       <label class="param">Sample time (s)
-        <input type="number" data-edit="ts" value="${block.params.ts}" step="0.01" min="0.001">
+        <input type="text" data-edit="ts" value="${block.params.ts}" step="0.01" min="0.001">
       </label>
     `;
     const aInput = inspectorBody.querySelector("input[data-edit='A']");
@@ -584,11 +644,11 @@ function renderInspector(block) {
     const dInput = inspectorBody.querySelector("input[data-edit='D']");
     const tsInput = inspectorBody.querySelector("input[data-edit='ts']");
     const update = () => {
-      block.params.A = Number(aInput.value);
-      block.params.B = Number(bInput.value);
-      block.params.C = Number(cInput.value);
-      block.params.D = Number(dInput.value);
-      block.params.ts = Math.max(0.001, Number(tsInput.value));
+      block.params.A = aInput.value;
+      block.params.B = bInput.value;
+      block.params.C = cInput.value;
+      block.params.D = dInput.value;
+      block.params.ts = tsInput.value;
     };
     [aInput, bInput, cInput, dInput, tsInput].forEach((input) => {
       input.addEventListener("input", update);
@@ -645,13 +705,24 @@ function serializeDiagram(state) {
     fromIndex: conn.fromIndex ?? 0,
     toIndex: conn.toIndex ?? 0,
   }));
-  return { version: 1, blocks, connections };
+  return { version: 1, blocks, connections, variables: state.variablesText || "" };
 }
 
 function loadDiagram(data) {
   if (!data || typeof data !== "object") throw new Error("Invalid diagram file");
   const blocks = Array.isArray(data.blocks) ? data.blocks : [];
   const connections = Array.isArray(data.connections) ? data.connections : [];
+  state.variablesText = typeof data.variables === "string" ? data.variables : "";
+  const variablesInput = document.getElementById("variablesInput");
+  const variablesPreview = document.getElementById("variablesPreview");
+  if (variablesInput) variablesInput.value = state.variablesText;
+  const parsed = parseVariables(state.variablesText);
+  state.variables = parsed.vars;
+  state.variablesDisplay = parsed.display;
+  if (variablesPreview) {
+    const entries = state.variablesDisplay.join("\n");
+    variablesPreview.textContent = entries || "No variables defined.";
+  }
   renderer.clearWorkspace();
   state.routingDirty = false;
   state.dirtyBlocks.clear();
@@ -935,6 +1006,55 @@ function init() {
       style.textContent = cssText;
       clone.insertBefore(style, clone.firstChild);
     }
+    const sanitizeMath = (root) => {
+      const sizeMap = {
+        "gain-math": 28,
+        "constant-math": 34,
+        "ss-math": 20,
+        "dss-math": 20,
+        "delay-math": 28,
+        "pid-math": 21,
+        "zoh-math": 21,
+        "foh-math": 21,
+        "label-math": 16,
+        "tf-math": 28,
+        "dtf-math": 28,
+        "integrator-math": 40,
+        "derivative-math": 40,
+        "ddelay-math": 28,
+      };
+      const getSize = (node) => {
+        let cur = node.parentElement;
+        while (cur) {
+          if (cur.classList) {
+            for (const cls of cur.classList) {
+              if (sizeMap[cls]) return sizeMap[cls];
+            }
+          }
+          cur = cur.parentElement;
+        }
+        return 28;
+      };
+      root.querySelectorAll("foreignObject").forEach((fo) => {
+        const tex = fo.querySelector(".mathjax-tex")?.textContent || "";
+        const cleaned = tex.replace(/^\\\(|^\\\[/, "").replace(/\\\)$|\\\]$/, "");
+        const x = Number(fo.getAttribute("x") || 0);
+        const y = Number(fo.getAttribute("y") || 0);
+        const w = Number(fo.getAttribute("width") || 0);
+        const h = Number(fo.getAttribute("height") || 0);
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", String(x + w / 2));
+        text.setAttribute("y", String(y + h / 2));
+        text.setAttribute("text-anchor", "middle");
+        text.setAttribute("dominant-baseline", "middle");
+        text.setAttribute("fill", "#1b1a17");
+        text.setAttribute("font-size", String(getSize(fo)));
+        text.textContent = cleaned;
+        fo.parentNode?.insertBefore(text, fo);
+        fo.remove();
+      });
+    };
+    sanitizeMath(clone);
     return new XMLSerializer().serializeToString(clone);
   };
 
@@ -969,96 +1089,54 @@ function init() {
     });
   };
 
-  const downloadPdf = async () => {
-    const { canvas, width, height } = await renderSvgToCanvas();
-    const jpgDataUrl = canvas.toDataURL("image/jpeg", 0.92);
-    const base64 = jpgDataUrl.split(",")[1] || "";
-    const binary = atob(base64);
-    const imgBytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) imgBytes[i] = binary.charCodeAt(i);
-
-    const parts = [];
-    const encoder = new TextEncoder();
-    const offsets = [];
-    let offset = 0;
-
-    const push = (data) => {
-      parts.push(data);
-      offset += data.length;
-    };
-    const pushStr = (str) => push(encoder.encode(str));
-
-    const objects = [];
-    const addObject = (body) => {
-      objects.push({ body });
-    };
-
-    addObject("<< /Type /Catalog /Pages 2 0 R >>");
-    addObject("<< /Type /Pages /Kids [3 0 R] /Count 1 >>");
-    addObject(
-      `<< /Type /Page /Parent 2 0 R /Resources << /XObject << /Im0 4 0 R >> >> /MediaBox [0 0 ${width} ${height}] /Contents 5 0 R >>`
-    );
-    addObject(
-      `<< /Type /XObject /Subtype /Image /Width ${width} /Height ${height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${imgBytes.length} >>`
-    );
-    const contentStream = `q ${width} 0 0 ${height} 0 0 cm /Im0 Do Q`;
-    addObject(`<< /Length ${contentStream.length} >>`);
-
-    pushStr("%PDF-1.4\n");
-    objects.forEach((obj, idx) => {
-      offsets[idx + 1] = offset;
-      pushStr(`${idx + 1} 0 obj\n`);
-      pushStr(obj.body);
-      pushStr("\n");
-      if (idx === 3) {
-        pushStr("stream\n");
-        push(imgBytes);
-        pushStr("\nendstream\nendobj\n");
-      } else if (idx === 4) {
-        pushStr("stream\n");
-        pushStr(contentStream);
-        pushStr("\nendstream\nendobj\n");
-      } else {
-        pushStr("endobj\n");
-      }
-    });
-    const xrefOffset = offset;
-    pushStr("xref\n");
-    pushStr(`0 ${objects.length + 1}\n`);
-    pushStr("0000000000 65535 f \n");
-    for (let i = 1; i <= objects.length; i += 1) {
-      const off = String(offsets[i]).padStart(10, "0");
-      pushStr(`${off} 00000 n \n`);
+  const downloadPdf = async (openTarget = null) => {
+    try {
+      statusEl.textContent = "Exporting PDF...";
+      const { canvas } = await renderSvgToCanvas();
+      canvas.toBlob((pngBlob) => {
+        if (!pngBlob) {
+          statusEl.textContent = "PDF export failed: PNG conversion failed";
+          return;
+        }
+        const pngUrl = URL.createObjectURL(pngBlob);
+        if (openTarget) {
+          openTarget.location = pngUrl;
+        } else {
+          const link = document.createElement("a");
+          link.href = pngUrl;
+          link.download = "vibesim.png";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+        setTimeout(() => URL.revokeObjectURL(pngUrl), 10000);
+        statusEl.textContent = "Image exported";
+      }, "image/png");
+    } catch (error) {
+      statusEl.textContent = `Export failed: ${error?.message || error}`;
     }
-    pushStr("trailer\n");
-    pushStr(`<< /Size ${objects.length + 1} /Root 1 0 R >>\n`);
-    pushStr("startxref\n");
-    pushStr(`${xrefOffset}\n%%EOF`);
-
-    const pdfBlob = new Blob(parts, { type: "application/pdf" });
-    const pdfUrl = URL.createObjectURL(pdfBlob);
-    const link = document.createElement("a");
-    link.href = pdfUrl;
-    link.download = "vibesim.pdf";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => URL.revokeObjectURL(pdfUrl), 10000);
   };
 
-  const printWorkspace = async () => {
-    const svgText = await exportSvg();
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(
-      `<html><head><title>Vibesim</title><style>body{margin:0;}</style></head><body>${svgText}</body></html>`
-    );
-    win.document.close();
-    win.focus();
-    win.print();
-  };
 
   initViewBox();
+
+  const variablesInput = document.getElementById("variablesInput");
+  const applyVariablesBtn = document.getElementById("applyVariables");
+  const variablesPreview = document.getElementById("variablesPreview");
+  const updateVariables = () => {
+    state.variablesText = variablesInput?.value || "";
+  const parsed = parseVariables(state.variablesText);
+  state.variables = parsed.vars;
+  state.variablesDisplay = parsed.display;
+  if (variablesPreview) {
+    const entries = state.variablesDisplay.join("\n");
+    variablesPreview.textContent = entries || "No variables defined.";
+  }
+    statusEl.textContent = "Variables updated";
+  };
+  if (applyVariablesBtn) applyVariablesBtn.addEventListener("click", updateVariables);
+  if (variablesInput) variablesInput.addEventListener("change", updateVariables);
+  updateVariables();
 
   document.querySelectorAll(".tool").forEach((button) => {
     button.addEventListener("click", () => {
@@ -1165,9 +1243,7 @@ function init() {
     });
   }
   if (printBtn) {
-    printBtn.addEventListener("click", () => {
-      downloadPdf();
-    });
+    printBtn.remove();
   }
 
   svg.addEventListener(

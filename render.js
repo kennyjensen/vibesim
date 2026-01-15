@@ -559,10 +559,28 @@ function buildPolyMathML(coeffs = []) {
   const parts = [];
   list.forEach((coeff, idx) => {
     const power = degree - idx;
-    const value = Number(coeff) || 0;
-    if (value === 0) return;
-    const sign = value < 0 ? "-" : "+";
-    const abs = Math.abs(value);
+    const raw = typeof coeff === "string" ? coeff.trim() : coeff;
+    const numeric = Number(raw);
+    const isNumeric = Number.isFinite(numeric);
+    if (isNumeric && numeric === 0) return;
+    let sign = "+";
+    let abs = numeric;
+    let sym = null;
+    if (!isNumeric) {
+      const text = String(raw || "");
+      if (!text) return;
+      if (text.startsWith("-")) {
+        sign = "-";
+        sym = text.slice(1).trim() || "0";
+      } else if (text.startsWith("+")) {
+        sym = text.slice(1).trim() || "0";
+      } else {
+        sym = text;
+      }
+    } else {
+      sign = numeric < 0 ? "-" : "+";
+      abs = Math.abs(numeric);
+    }
     const isFirst = parts.length === 0;
     if (!isFirst) {
       parts.push(`<mo>${sign}</mo>`);
@@ -570,10 +588,14 @@ function buildPolyMathML(coeffs = []) {
       parts.push("<mo>-</mo>");
     }
     if (power === 0) {
-      parts.push(`<mn>${abs}</mn>`);
+      if (sym) parts.push(`<mi>${sym}</mi>`);
+      else parts.push(`<mn>${abs}</mn>`);
       return;
     }
-    if (abs !== 1) {
+    if (sym) {
+      parts.push(`<mi>${sym}</mi>`);
+      parts.push("<mo>&#x2062;</mo>");
+    } else if (abs !== 1) {
       parts.push(`<mn>${abs}</mn>`);
       parts.push("<mo>&#x2062;</mo>");
     }
@@ -602,10 +624,28 @@ function buildPolyTeX(coeffs = [], variable = "s") {
   const parts = [];
   list.forEach((coeff, idx) => {
     const power = degree - idx;
-    const value = Number(coeff) || 0;
-    if (value === 0) return;
-    const sign = value < 0 ? "-" : "+";
-    const abs = Math.abs(value);
+    const raw = typeof coeff === "string" ? coeff.trim() : coeff;
+    const numeric = Number(raw);
+    const isNumeric = Number.isFinite(numeric);
+    if (isNumeric && numeric === 0) return;
+    let sign = "+";
+    let abs = numeric;
+    let sym = null;
+    if (!isNumeric) {
+      const text = String(raw || "");
+      if (!text) return;
+      if (text.startsWith("-")) {
+        sign = "-";
+        sym = text.slice(1).trim() || "0";
+      } else if (text.startsWith("+")) {
+        sym = text.slice(1).trim() || "0";
+      } else {
+        sym = text;
+      }
+    } else {
+      sign = numeric < 0 ? "-" : "+";
+      abs = Math.abs(numeric);
+    }
     const isFirst = parts.length === 0;
     if (!isFirst) {
       parts.push(sign);
@@ -613,11 +653,16 @@ function buildPolyTeX(coeffs = [], variable = "s") {
       parts.push("-");
     }
     if (power === 0) {
-      parts.push(`${abs}`);
+      parts.push(sym ? sym : `${abs}`);
       return;
     }
-    if (abs !== 1) {
+    if (sym) {
+      parts.push(`${sym}`);
+    } else if (abs !== 1) {
       parts.push(`${abs}`);
+    }
+    if (sym) {
+      parts.push("\\,");
     }
     if (power === 1) {
       parts.push(variable);
@@ -822,24 +867,24 @@ const blockTemplates = {
     },
   },
   sum: {
-    width: 40,
-    height: 40,
+    width: 20,
+    height: 20,
     inputs: [
-      { x: 0, y: 20, side: "left" },
-      { x: 20, y: 0, side: "top" },
-      { x: 20, y: 40, side: "bottom" },
+      { x: 0, y: 10, side: "left" },
+      { x: 10, y: 0, side: "top" },
+      { x: 10, y: 20, side: "bottom" },
     ],
-    outputs: [{ x: 40, y: 20, side: "right" }],
+    outputs: [{ x: 20, y: 10, side: "right" }],
     defaultParams: { signs: [1, 1, 1] },
     render: (block) => {
       const group = block.group;
-      group.appendChild(createSvgElement("circle", { cx: 20, cy: 20, r: 20, class: "sum-circle" }));
-      group.appendChild(createSvgElement("line", { x1: 20, y1: 0, x2: 20, y2: 40, class: "sum-line" }));
-      group.appendChild(createSvgElement("line", { x1: 0, y1: 20, x2: 40, y2: 20, class: "sum-line" }));
+      group.appendChild(createSvgElement("circle", { cx: 10, cy: 10, r: 10, class: "sum-circle" }));
+      group.appendChild(createSvgElement("line", { x1: 10, y1: 0, x2: 10, y2: 20, class: "sum-line" }));
+      group.appendChild(createSvgElement("line", { x1: 0, y1: 10, x2: 20, y2: 10, class: "sum-line" }));
       const signPositions = [
-        { x: -12, y: 12 },
-        { x: 32, y: -6 },
-        { x: 32, y: 46 },
+        { x: -24, y: 2 },
+        { x: 26, y: -14 },
+        { x: 26, y: 30 },
       ];
       signPositions.forEach((pos, idx) => {
         const sign = (block.params.signs?.[idx] ?? 1) < 0 ? "-" : "";
@@ -1336,15 +1381,15 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     if (!defs.querySelector("#wire-arrow")) {
       const marker = createSvgElement("marker", {
         id: "wire-arrow",
-        markerWidth: 16,
-        markerHeight: 16,
-        refX: 16,
-        refY: 8,
+        markerWidth: 12,
+        markerHeight: 12,
+        refX: 12,
+        refY: 6,
         orient: "auto",
         markerUnits: "userSpaceOnUse",
       });
       marker.appendChild(
-        createSvgElement("path", { d: "M0,0 L16,8 L0,16 Z", class: "wire-arrow" })
+        createSvgElement("path", { d: "M0,0 L12,6 L0,12 Z", class: "wire-arrow" })
       );
       defs.appendChild(marker);
     }
@@ -1467,12 +1512,12 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     group.appendChild(dragRect);
 
     template.inputs.forEach((port, index) => {
-      const circle = createPortCircle(id, "in", index, port);
+      const circle = createPortCircle(id, "in", index, port, type);
       group.appendChild(circle);
       block.ports.push({ ...port, type: "in", index, el: circle });
     });
     template.outputs.forEach((port, index) => {
-      const circle = createPortCircle(id, "out", index, port);
+      const circle = createPortCircle(id, "out", index, port, type);
       group.appendChild(circle);
       block.ports.push({ ...port, type: "out", index, el: circle });
     });
@@ -1488,16 +1533,25 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     updateConnections();
   }
 
-  function createPortCircle(blockId, type, index, port) {
+  function createPortCircle(blockId, type, index, port, blockType) {
     const group = createSvgElement("g", {
       class: "port-group",
       "data-block-id": blockId,
       "data-port-type": type,
       "data-port-index": index,
     });
+    const hitOffset = blockType === "sum" ? GRID_SIZE : 0;
+    let hitX = port.x;
+    let hitY = port.y;
+    if (hitOffset) {
+      if (port.side === "left") hitX -= hitOffset;
+      if (port.side === "right") hitX += hitOffset;
+      if (port.side === "top") hitY -= hitOffset;
+      if (port.side === "bottom") hitY += hitOffset;
+    }
     const hit = createSvgElement("circle", {
-      cx: port.x,
-      cy: port.y,
+      cx: hitX,
+      cy: hitY,
       r: 12,
       class: "port-hit",
     });

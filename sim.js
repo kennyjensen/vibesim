@@ -9,6 +9,50 @@ export function simulate({ state, runtimeInput, statusEl }) {
   }
 
   const inputMap = new Map();
+  const variables = state.variables || { pi: Math.PI, e: Math.E };
+  const replaceLatexVars = (expr) =>
+    String(expr || "").replace(/\\[A-Za-z]+/g, (match) => match.slice(1));
+  const evalExpression = (expr, vars) => {
+    if (typeof expr === "number") return expr;
+    if (expr == null) return NaN;
+    const trimmed = replaceLatexVars(expr).trim();
+    if (!trimmed) return NaN;
+    const num = Number(trimmed);
+    if (Number.isFinite(num)) return num;
+    try {
+      const names = Object.keys(vars);
+      const values = Object.values(vars);
+      const fn = Function(...names, "Math", `"use strict"; return (${trimmed});`);
+      const result = fn(...values, Math);
+      return Number.isFinite(result) ? result : NaN;
+    } catch {
+      return NaN;
+    }
+  };
+  const resolveParam = (value, block, key) => {
+    if (block.type === "labelSource" || block.type === "labelSink") {
+      if (key === "name") return value;
+    }
+    if (block.type === "fileSource" || block.type === "fileSink") {
+      if (key === "path" || key === "times" || key === "values" || key === "lastCsv") return value;
+    }
+    if (key === "signs") return value;
+    if (Array.isArray(value)) return value.map((v) => {
+      const out = evalExpression(v, variables);
+      return Number.isFinite(out) ? out : 0;
+    });
+    const out = evalExpression(value, variables);
+    return Number.isFinite(out) ? out : 0;
+  };
+  const resolvedParams = new Map();
+  blocks.forEach((block) => {
+    const params = block.params || {};
+    const resolved = {};
+    Object.entries(params).forEach(([key, value]) => {
+      resolved[key] = resolveParam(value, block, key);
+    });
+    resolvedParams.set(block.id, resolved);
+  });
   blocks.forEach((block) => {
     inputMap.set(block.id, Array(block.inputs).fill(null));
   });
@@ -51,13 +95,14 @@ export function simulate({ state, runtimeInput, statusEl }) {
   });
 
   blocks.forEach((block) => {
+    const params = resolvedParams.get(block.id) || {};
     if (block.type === "labelSink") {
       const name = String(block.params.name || "").trim();
       if (name) labelSinks.set(name, block.id);
     }
     if (block.type === "rate") block.rateState = 0;
     if (block.type === "tf") {
-      const model = buildTfModel(block.params.num, block.params.den);
+      const model = buildTfModel(params.num, params.den);
       tfModels.set(block.id, model);
       block.tfState = model ? model.state.slice() : [];
     }
@@ -68,32 +113,32 @@ export function simulate({ state, runtimeInput, statusEl }) {
     if (block.type === "zoh") zohState.set(block.id, { lastSample: 0, nextTime: 0 });
     if (block.type === "foh") fohState.set(block.id, { prevSample: 0, lastSample: 0, lastTime: 0, nextTime: 0 });
     if (block.type === "dtf") {
-      const model = buildDiscreteTf(block.params.num, block.params.den);
+      const model = buildDiscreteTf(params.num, params.den);
       dtfState.set(block.id, { model, xHist: Array(model.num.length).fill(0), yHist: Array(model.den.length - 1).fill(0), nextTime: 0 });
     }
     if (block.type === "backlash") backlashState.set(block.id, 0);
     if (block.type === "delay") {
-      const steps = Math.max(1, Math.round(Number(block.params.delay || 0) / dt));
+      const steps = Math.max(1, Math.round(Number(params.delay || 0) / dt));
       delayState.set(block.id, { buffer: Array(steps + 1).fill(0) });
     }
     if (block.type === "ddelay") {
-      const steps = Math.max(1, Math.round(Number(block.params.steps) || 1));
-      const ts = Math.max(0.001, Number(block.params.ts) || 0.1);
+      const steps = Math.max(1, Math.round(Number(params.steps) || 1));
+      const ts = Math.max(0.001, Number(params.ts) || 0.1);
       ddelayState.set(block.id, { queue: Array(steps).fill(0), nextTime: 0, lastOut: 0, ts });
     }
     if (block.type === "stateSpace") {
       stateSpaceState.set(block.id, 0);
     }
     if (block.type === "dstateSpace") {
-      const ts = Math.max(0.001, Number(block.params.ts) || 0.1);
+      const ts = Math.max(0.001, Number(params.ts) || 0.1);
       dstateSpaceState.set(block.id, { x: 0, nextTime: 0, lastOut: 0, ts });
     }
     if (["lpf", "hpf", "derivative", "pid", "zoh", "foh", "dtf", "backlash", "delay", "ddelay", "stateSpace", "dstateSpace"].includes(block.type)) {
       outputState.set(block.id, 0);
     }
     if (block.type === "fileSource") {
-      const times = Array.isArray(block.params.times) ? block.params.times : [];
-      const values = Array.isArray(block.params.values) ? block.params.values : [];
+      const times = Array.isArray(params.times) ? params.times : [];
+      const values = Array.isArray(params.values) ? params.values : [];
       const data = times.length ? { times, values } : null;
       fileSourceState.set(block.id, { data, idx: 0 });
     }
@@ -109,40 +154,41 @@ export function simulate({ state, runtimeInput, statusEl }) {
     const outputs = new Map();
 
     blocks.forEach((block) => {
+      const params = resolvedParams.get(block.id) || {};
       if (block.type === "constant") {
-        outputs.set(block.id, Number(block.params.value) || 0);
+        outputs.set(block.id, Number(params.value) || 0);
       }
       if (block.type === "step") {
-        const stepTime = Number(block.params.stepTime) || 0;
+        const stepTime = Number(params.stepTime) || 0;
         outputs.set(block.id, t >= stepTime ? 1 : 0);
       }
       if (block.type === "ramp") {
-        const slope = Number(block.params.slope) || 0;
-        const start = Number(block.params.start) || 0;
+        const slope = Number(params.slope) || 0;
+        const start = Number(params.start) || 0;
         outputs.set(block.id, t >= start ? slope * (t - start) : 0);
       }
       if (block.type === "impulse") {
-        const timePoint = Number(block.params.time) || 0;
-        const amp = Number(block.params.amp) || 0;
+        const timePoint = Number(params.time) || 0;
+        const amp = Number(params.amp) || 0;
         outputs.set(block.id, Math.abs(t - timePoint) <= dt / 2 ? amp / Math.max(dt, 1e-6) : 0);
       }
       if (block.type === "sine") {
-        const amp = Number(block.params.amp) || 0;
-        const freq = Number(block.params.freq) || 0;
-        const phase = Number(block.params.phase) || 0;
+        const amp = Number(params.amp) || 0;
+        const freq = Number(params.freq) || 0;
+        const phase = Number(params.phase) || 0;
         outputs.set(block.id, amp * Math.sin(2 * Math.PI * freq * t + phase));
       }
       if (block.type === "chirp") {
-        const amp = Number(block.params.amp) || 0;
-        const f0 = Number(block.params.f0) || 0;
-        const f1 = Number(block.params.f1) || 0;
-        const t1 = Math.max(0.001, Number(block.params.t1) || 1);
+        const amp = Number(params.amp) || 0;
+        const f0 = Number(params.f0) || 0;
+        const f1 = Number(params.f1) || 0;
+        const t1 = Math.max(0.001, Number(params.t1) || 1);
         const k = (f1 - f0) / t1;
         const phase = 2 * Math.PI * (f0 * t + 0.5 * k * t * t);
         outputs.set(block.id, amp * Math.sin(phase));
       }
       if (block.type === "noise") {
-        const amp = Number(block.params.amp) || 0;
+        const amp = Number(params.amp) || 0;
         outputs.set(block.id, amp * (Math.random() * 2 - 1));
       }
       if (block.type === "fileSource") {
@@ -228,6 +274,7 @@ export function simulate({ state, runtimeInput, statusEl }) {
       progress = false;
       if (resolveLabelSources()) progress = true;
       blocks.forEach((block) => {
+        const params = resolvedParams.get(block.id) || {};
         if (outputs.has(block.id)) return;
         if (["scope", "integrator", "tf", "delay", "ddelay", "stateSpace", "dstateSpace", "lpf", "hpf", "derivative", "pid", "zoh", "foh", "dtf", "backlash", "fileSink", "labelSink", "labelSource"].includes(block.type)) return;
 
@@ -237,16 +284,19 @@ export function simulate({ state, runtimeInput, statusEl }) {
 
         let out = 0;
         if (block.type === "gain") {
-          const gainValue = Number(block.params.gain) || 1;
+          const gainValue = Number(params.gain) || 1;
           out = (values[0] || 0) * gainValue;
         } else if (block.type === "sum") {
           const signs = block.params.signs || [];
           out = values.reduce((acc, v, idx) => acc + (v ?? 0) * (signs[idx] ?? 1), 0);
         } else if (block.type === "mult") {
-          out = (values[0] ?? 0) * (values[1] ?? 0);
+          const v0 = values[0] ?? 1;
+          const v1 = values[1] ?? 1;
+          const v2 = values[2] ?? 1;
+          out = v0 * v1 * v2;
         } else if (block.type === "saturation") {
-          const min = Number(block.params.min);
-          const max = Number(block.params.max);
+          const min = Number(params.min);
+          const max = Number(params.max);
           const value = values[0] ?? 0;
           out = Math.max(min, Math.min(max, value));
         }
@@ -290,14 +340,15 @@ export function simulate({ state, runtimeInput, statusEl }) {
 
     blocks.forEach((block) => {
       if (block.type !== "stateSpace") return;
+      const params = resolvedParams.get(block.id) || {};
       const inputs = inputMap.get(block.id) || [];
       const fromId = inputs[0];
       const u = fromId ? outputs.get(fromId) : 0;
       const xPrev = stateSpaceState.get(block.id) || 0;
-      const A = Number(block.params.A) || 0;
-      const B = Number(block.params.B) || 0;
-      const C = Number(block.params.C) || 0;
-      const D = Number(block.params.D) || 0;
+      const A = Number(params.A) || 0;
+      const B = Number(params.B) || 0;
+      const C = Number(params.C) || 0;
+      const D = Number(params.D) || 0;
       const dx = A * xPrev + B * (u ?? 0);
       const xNext = integrateRK4(xPrev, dx, dt);
       stateSpaceState.set(block.id, xNext);
@@ -306,6 +357,7 @@ export function simulate({ state, runtimeInput, statusEl }) {
 
     blocks.forEach((block) => {
       if (block.type !== "delay") return;
+      const params = resolvedParams.get(block.id) || {};
       const inputs = inputMap.get(block.id) || [];
       const fromId = inputs[0];
       const inputVal = fromId ? outputs.get(fromId) : 0;
@@ -319,12 +371,13 @@ export function simulate({ state, runtimeInput, statusEl }) {
 
     blocks.forEach((block) => {
       if (block.type !== "ddelay") return;
+      const params = resolvedParams.get(block.id) || {};
       const inputs = inputMap.get(block.id) || [];
       const fromId = inputs[0];
       const inputVal = fromId ? outputs.get(fromId) : 0;
       const state = ddelayState.get(block.id);
       if (!state) return;
-      const ts = Math.max(0.001, Number(block.params.ts) || state.ts || 0.1);
+      const ts = Math.max(0.001, Number(params.ts) || state.ts || 0.1);
       state.ts = ts;
       if (t + 1e-9 >= state.nextTime) {
         state.queue.push(inputVal ?? 0);
@@ -339,16 +392,17 @@ export function simulate({ state, runtimeInput, statusEl }) {
 
     blocks.forEach((block) => {
       if (block.type !== "dstateSpace") return;
+      const params = resolvedParams.get(block.id) || {};
       const inputs = inputMap.get(block.id) || [];
       const fromId = inputs[0];
       const u = fromId ? outputs.get(fromId) : 0;
       const state = dstateSpaceState.get(block.id);
       if (!state) return;
-      const A = Number(block.params.A) || 0;
-      const B = Number(block.params.B) || 0;
-      const C = Number(block.params.C) || 0;
-      const D = Number(block.params.D) || 0;
-      const ts = Math.max(0.001, Number(block.params.ts) || state.ts || 0.1);
+      const A = Number(params.A) || 0;
+      const B = Number(params.B) || 0;
+      const C = Number(params.C) || 0;
+      const D = Number(params.D) || 0;
+      const ts = Math.max(0.001, Number(params.ts) || state.ts || 0.1);
       state.ts = ts;
       if (t + 1e-9 >= state.nextTime) {
         const xNext = A * state.x + B * (u ?? 0);
@@ -364,13 +418,14 @@ export function simulate({ state, runtimeInput, statusEl }) {
 
     blocks.forEach((block) => {
       if (block.type !== "rate") return;
+      const params = resolvedParams.get(block.id) || {};
       const inputs = inputMap.get(block.id) || [];
       const fromId = inputs[0];
       const inputVal = fromId ? outputs.get(fromId) : 0;
       if (inputVal === undefined) return;
       const prev = block.rateState ?? 0;
-      const rise = Math.max(0, Number(block.params.rise));
-      const fall = Math.max(0, Number(block.params.fall));
+      const rise = Math.max(0, Number(params.rise));
+      const fall = Math.max(0, Number(params.fall));
       const maxRise = prev + rise * dt;
       const maxFall = prev - fall * dt;
       block.rateState = Math.min(maxRise, Math.max(maxFall, inputVal));
@@ -389,10 +444,11 @@ export function simulate({ state, runtimeInput, statusEl }) {
 
     blocks.forEach((block) => {
       if (block.type !== "lpf") return;
+      const params = resolvedParams.get(block.id) || {};
       const inputs = inputMap.get(block.id) || [];
       const inputVal = inputs[0] ? outputs.get(inputs[0]) : 0;
       const prev = lpfState.get(block.id) || 0;
-      const fc = Math.max(0, Number(block.params.cutoff) || 0);
+      const fc = Math.max(0, Number(params.cutoff) || 0);
       const wc = 2 * Math.PI * fc;
       const next = prev + dt * wc * ((inputVal ?? 0) - prev);
       lpfState.set(block.id, next);
@@ -401,10 +457,11 @@ export function simulate({ state, runtimeInput, statusEl }) {
 
     blocks.forEach((block) => {
       if (block.type !== "hpf") return;
+      const params = resolvedParams.get(block.id) || {};
       const inputs = inputMap.get(block.id) || [];
       const inputVal = inputs[0] ? outputs.get(inputs[0]) : 0;
       const prev = hpfState.get(block.id) || 0;
-      const fc = Math.max(0, Number(block.params.cutoff) || 0);
+      const fc = Math.max(0, Number(params.cutoff) || 0);
       const wc = 2 * Math.PI * fc;
       const next = prev + dt * wc * ((inputVal ?? 0) - prev);
       hpfState.set(block.id, next);
@@ -423,12 +480,13 @@ export function simulate({ state, runtimeInput, statusEl }) {
 
     blocks.forEach((block) => {
       if (block.type !== "pid") return;
+      const params = resolvedParams.get(block.id) || {};
       const inputs = inputMap.get(block.id) || [];
       const inputVal = inputs[0] ? outputs.get(inputs[0]) : 0;
       const state = pidState.get(block.id) || { integral: 0, prev: 0 };
-      const kp = Number(block.params.kp) || 0;
-      const ki = Number(block.params.ki) || 0;
-      const kd = Number(block.params.kd) || 0;
+      const kp = Number(params.kp) || 0;
+      const ki = Number(params.ki) || 0;
+      const kd = Number(params.kd) || 0;
       const nextIntegral = state.integral + (inputVal ?? 0) * dt;
       const derivative = ((inputVal ?? 0) - state.prev) / Math.max(dt, 1e-6);
       const out = kp * (inputVal ?? 0) + ki * nextIntegral + kd * derivative;
@@ -438,10 +496,11 @@ export function simulate({ state, runtimeInput, statusEl }) {
 
     blocks.forEach((block) => {
       if (block.type !== "zoh") return;
+      const params = resolvedParams.get(block.id) || {};
       const inputs = inputMap.get(block.id) || [];
       const inputVal = inputs[0] ? outputs.get(inputs[0]) : 0;
       const state = zohState.get(block.id);
-      const ts = Math.max(0.001, Number(block.params.ts) || dt);
+      const ts = Math.max(0.001, Number(params.ts) || dt);
       if (t + 1e-6 >= state.nextTime) {
         state.lastSample = inputVal ?? 0;
         state.nextTime = t + ts;
@@ -451,10 +510,11 @@ export function simulate({ state, runtimeInput, statusEl }) {
 
     blocks.forEach((block) => {
       if (block.type !== "foh") return;
+      const params = resolvedParams.get(block.id) || {};
       const inputs = inputMap.get(block.id) || [];
       const inputVal = inputs[0] ? outputs.get(inputs[0]) : 0;
       const state = fohState.get(block.id);
-      const ts = Math.max(0.001, Number(block.params.ts) || dt);
+      const ts = Math.max(0.001, Number(params.ts) || dt);
       if (t + 1e-6 >= state.nextTime) {
         state.prevSample = state.lastSample;
         state.lastSample = inputVal ?? 0;
@@ -468,10 +528,11 @@ export function simulate({ state, runtimeInput, statusEl }) {
 
     blocks.forEach((block) => {
       if (block.type !== "dtf") return;
+      const params = resolvedParams.get(block.id) || {};
       const inputs = inputMap.get(block.id) || [];
       const inputVal = inputs[0] ? outputs.get(inputs[0]) : 0;
       const state = dtfState.get(block.id);
-      const ts = Math.max(0.001, Number(block.params.ts) || dt);
+      const ts = Math.max(0.001, Number(params.ts) || dt);
       if (t + 1e-6 >= state.nextTime) {
         state.xHist.pop();
         state.xHist.unshift(inputVal ?? 0);
@@ -485,9 +546,10 @@ export function simulate({ state, runtimeInput, statusEl }) {
 
     blocks.forEach((block) => {
       if (block.type !== "backlash") return;
+      const params = resolvedParams.get(block.id) || {};
       const inputs = inputMap.get(block.id) || [];
       const inputVal = inputs[0] ? outputs.get(inputs[0]) : 0;
-      const width = Math.max(0, Number(block.params.width) || 0);
+      const width = Math.max(0, Number(params.width) || 0);
       const prev = backlashState.get(block.id) || 0;
       let out = prev;
       if ((inputVal ?? 0) > prev + width / 2) out = (inputVal ?? 0) - width / 2;

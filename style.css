@@ -588,6 +588,34 @@ body {
   border-radius: 8px;
 }
 
+.variables-panel {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f7eddf;
+  border: 1px solid #c6b391;
+  border-radius: 8px;
+}
+
+.variables-panel textarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  margin-bottom: 8px;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  padding: 8px;
+  border: 1px solid #3c3c3c;
+  border-radius: 6px;
+  background: #fdf7ef;
+}
+
+.variables-preview {
+  font-size: 12px;
+  color: #3c3c3c;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
 .inspector h3 {
   margin: 0 0 8px 0;
   font-size: 1rem;

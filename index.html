@@ -90,6 +90,12 @@
         <button id="rotateSelection" class="secondary">Rotate</button>
         <button id="deleteSelection" class="danger">Delete</button>
       </div>
+      <div id="variablesPanel" class="variables-panel">
+        <h3>Variables</h3>
+        <textarea id="variablesInput" rows="6" placeholder="k=2&#10;w=3.14"></textarea>
+        <button id="applyVariables" class="secondary">Apply</button>
+        <div id="variablesPreview" class="variables-preview"></div>
+      </div>
       <div id="debugPanel" class="debug-panel">
         <h3>Debug</h3>
         <button id="copyDebug" class="secondary">Copy debug</button>
@@ -123,12 +129,6 @@
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="11" cy="11" r="7" />
               <path d="M8 11h6M16.5 16.5L21 21" />
-            </svg>
-          </button>
-          <button id="printBtn" class="floating-btn" aria-label="Print" title="Print">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M7 7V4h10v3M7 17h10v3H7z" />
-              <rect x="4" y="9" width="16" height="6" rx="1" />
             </svg>
           </button>
         </div>
