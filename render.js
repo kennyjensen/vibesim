@@ -1444,6 +1444,15 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     display: "none",
   });
   overlayLayer.appendChild(selectionRect);
+  const marqueeRect = createSvgElement("rect", {
+    class: "selection-marquee",
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    display: "none",
+  });
+  overlayLayer.appendChild(marqueeRect);
   const debugBaseRect = createSvgElement("rect", {
     class: "selection-debug-base",
     x: 0,
@@ -1747,6 +1756,7 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     let didDrag = false;
     let startClient = null;
     let startedFromPort = false;
+    let dragGroup = null;
     const DRAG_THRESHOLD = 6;
 
     const beginPointer = (event, fromPort = false) => {
@@ -1781,16 +1791,48 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
         const point = clientToSvg(event.clientX, event.clientY);
         offsetX = point.x - block.x;
         offsetY = point.y - block.y;
+        const selectedIds = state.selectedIds || new Set();
+        if (selectedIds.size > 1 && selectedIds.has(block.id)) {
+          const startPositions = new Map();
+          selectedIds.forEach((id) => {
+            const selectedBlock = state.blocks.get(id);
+            if (selectedBlock) startPositions.set(id, { x: selectedBlock.x, y: selectedBlock.y });
+          });
+          dragGroup = { startPositions };
+        } else {
+          dragGroup = null;
+        }
       }
       const point = clientToSvg(event.clientX, event.clientY);
       const x = snap(point.x - offsetX);
       const y = snap(point.y - offsetY);
-      block.x = Math.max(0, x);
-      block.y = Math.max(0, y);
-      updateBlockTransform(block);
+      if (dragGroup) {
+        const startPos = dragGroup.startPositions.get(block.id);
+        if (startPos) {
+          const dx = x - startPos.x;
+          const dy = y - startPos.y;
+          dragGroup.startPositions.forEach((pos, id) => {
+            const selectedBlock = state.blocks.get(id);
+            if (!selectedBlock) return;
+            selectedBlock.x = Math.max(0, pos.x + dx);
+            selectedBlock.y = Math.max(0, pos.y + dy);
+            updateBlockTransform(selectedBlock);
+          });
+        }
+      } else {
+        block.x = Math.max(0, x);
+        block.y = Math.max(0, y);
+        updateBlockTransform(block);
+      }
       state.fastRouting = true;
       state.routingDirty = true;
-      if (state.dirtyBlocks) state.dirtyBlocks.add(block.id);
+      if (state.dirtyBlocks) {
+        if (dragGroup) {
+          dragGroup.startPositions.forEach((_pos, id) => state.dirtyBlocks.add(id));
+        } else {
+          state.dirtyBlocks.add(block.id);
+        }
+      }
       updateConnections();
     });
 
@@ -1804,10 +1846,17 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
       didDrag = false;
       state.fastRouting = false;
       if (moved) {
-        if (state.dirtyBlocks) state.dirtyBlocks.add(block.id);
+        if (state.dirtyBlocks) {
+          if (dragGroup) {
+            dragGroup.startPositions.forEach((_pos, id) => state.dirtyBlocks.add(id));
+          } else {
+            state.dirtyBlocks.add(block.id);
+          }
+        }
         state.routingDirty = true;
         updateConnections(true);
       }
+      dragGroup = null;
     });
 
     block.group.addEventListener("pointercancel", () => {
@@ -1862,18 +1911,25 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
   function enableSelection(block, handle) {
     handle.addEventListener("click", (event) => {
       event.stopPropagation();
-      selectBlock(block.id);
+      if (!event.ctrlKey) {
+        selectBlock(block.id);
+      }
     });
   }
 
   function updatePortVisibility() {
-    const show = Boolean(state.selectedId || state.pendingPort);
+    const show = Boolean((state.selectedIds && state.selectedIds.size > 0) || state.selectedId || state.pendingPort);
     svg.classList.toggle("ports-visible", show);
   }
 
   function selectBlock(blockId) {
     state.selectedId = blockId;
     state.selectedConnection = null;
+    if (state.selectedIds) {
+      state.selectedIds.clear();
+      if (blockId) state.selectedIds.add(blockId);
+    }
+    if (state.selectedConnections) state.selectedConnections.clear();
     state.blocks.forEach((block) => {
       block.group.classList.toggle("selected", block.id === blockId);
     });
@@ -1888,6 +1944,11 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
   function selectConnection(conn) {
     state.selectedConnection = conn;
     state.selectedId = null;
+    if (state.selectedConnections) {
+      state.selectedConnections.clear();
+      if (conn) state.selectedConnections.add(conn);
+    }
+    if (state.selectedIds) state.selectedIds.clear();
     state.blocks.forEach((block) => {
       block.group.classList.toggle("selected", false);
     });
@@ -1912,6 +1973,140 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     });
     updatePortVisibility();
     updateSelectionBox();
+  }
+
+  svg.addEventListener("pointermove", (event) => {
+    if (!marqueeState.active) return;
+    if (event.pointerId !== marqueeState.pointerId) return;
+    const point = clientToSvg(event.clientX, event.clientY);
+    updateMarqueeRect(marqueeState.start, point);
+  });
+
+  svg.addEventListener("pointerup", (event) => {
+    if (!marqueeState.active) return;
+    if (event.pointerId !== marqueeState.pointerId) return;
+    finishMarqueeSelection(event);
+  });
+
+  svg.addEventListener("pointercancel", (event) => {
+    if (!marqueeState.active) return;
+    if (event.pointerId !== marqueeState.pointerId) return;
+    marqueeRect.setAttribute("display", "none");
+    marqueeState.active = false;
+    marqueeState.pointerId = null;
+    marqueeState.start = null;
+  });
+
+  const marqueeState = {
+    active: false,
+    pointerId: null,
+    start: null,
+  };
+
+  function updateMarqueeRect(start, current) {
+    const left = Math.min(start.x, current.x);
+    const right = Math.max(start.x, current.x);
+    const top = Math.min(start.y, current.y);
+    const bottom = Math.max(start.y, current.y);
+    marqueeRect.setAttribute("display", "block");
+    marqueeRect.setAttribute("x", left);
+    marqueeRect.setAttribute("y", top);
+    marqueeRect.setAttribute("width", right - left);
+    marqueeRect.setAttribute("height", bottom - top);
+    return { left, right, top, bottom };
+  }
+
+  function setMultiSelection(blockIds, connections) {
+    if (state.selectedIds) {
+      state.selectedIds.clear();
+      blockIds.forEach((id) => state.selectedIds.add(id));
+    }
+    if (state.selectedConnections) {
+      state.selectedConnections.clear();
+      connections.forEach((conn) => state.selectedConnections.add(conn));
+    }
+    state.selectedId = blockIds.size === 1 && connections.size === 0 ? Array.from(blockIds)[0] : null;
+    state.selectedConnection = connections.size === 1 && blockIds.size === 0 ? Array.from(connections)[0] : null;
+    state.blocks.forEach((block) => {
+      block.group.classList.toggle("selected", blockIds.has(block.id));
+    });
+    state.connections.forEach((conn) => {
+      conn.path.classList.toggle("selected", connections.has(conn));
+    });
+    if (state.selectedId) {
+      onSelectBlock(state.blocks.get(state.selectedId));
+    } else if (state.selectedConnection) {
+      const conn = state.selectedConnection;
+      const fromBlock = state.blocks.get(conn.from);
+      const toBlock = state.blocks.get(conn.to);
+      onSelectConnection({
+        kind: "connection",
+        fromId: conn.from,
+        toId: conn.to,
+        toIndex: conn.toIndex,
+        fromType: fromBlock?.type || "unknown",
+        toType: toBlock?.type || "unknown",
+      });
+    } else if (blockIds.size || connections.size) {
+      onSelectBlock({ kind: "multi", blocks: blockIds.size, connections: connections.size });
+    } else {
+      onSelectBlock(null);
+      onSelectConnection(null);
+    }
+    updatePortVisibility();
+    updateSelectionBox();
+  }
+
+  function startMarqueeSelection(event) {
+    if (event.button !== 0) return;
+    const point = clientToSvg(event.clientX, event.clientY);
+    marqueeState.active = true;
+    marqueeState.pointerId = event.pointerId;
+    marqueeState.start = point;
+    updateMarqueeRect(point, point);
+    try {
+      svg.setPointerCapture(event.pointerId);
+    } catch (err) {
+      // Ignore capture failures.
+    }
+  }
+
+  function finishMarqueeSelection(event) {
+    const point = clientToSvg(event.clientX, event.clientY);
+    const rect = updateMarqueeRect(marqueeState.start, point);
+    marqueeRect.setAttribute("display", "none");
+    marqueeState.active = false;
+    marqueeState.pointerId = null;
+    marqueeState.start = null;
+    state.suppressNextCanvasClick = true;
+
+    const selectedBlocks = new Set();
+    state.blocks.forEach((block) => {
+      const bounds = getRotatedBounds(block);
+      const intersects =
+        rect.left <= bounds.right &&
+        rect.right >= bounds.left &&
+        rect.top <= bounds.bottom &&
+        rect.bottom >= bounds.top;
+      if (intersects) selectedBlocks.add(block.id);
+    });
+
+    const selectedConnections = new Set();
+    state.connections.forEach((conn) => {
+      let points = conn.points || [];
+      if (!points || points.length < 2) {
+        points = buildFallbackPathFromPorts(conn);
+      }
+      const renderPoints = applyWireOffsets(conn, points);
+      for (let i = 0; i < renderPoints.length - 1; i += 1) {
+        if (segmentHitsRect(renderPoints[i], renderPoints[i + 1], rect)) {
+          selectedConnections.add(conn);
+          break;
+        }
+      }
+    });
+
+    setMultiSelection(selectedBlocks, selectedConnections);
   }
 
   function enableScopeHover(block) {
@@ -2839,10 +3034,13 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     state.nextId = 1;
     state.selectedId = null;
     state.selectedConnection = null;
+    if (state.selectedIds) state.selectedIds.clear();
+    if (state.selectedConnections) state.selectedConnections.clear();
     state.deleteMode = false;
     blockLayer.innerHTML = "";
     wireLayer.innerHTML = "";
     selectionRect.setAttribute("display", "none");
+    marqueeRect.setAttribute("display", "none");
     updatePortVisibility();
   }
 
@@ -3029,6 +3227,7 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     selectConnection,
     clearPending,
     selectBlock,
+    startMarqueeSelection,
     clearWorkspace,
     findNearestConnection,
     deleteConnection,

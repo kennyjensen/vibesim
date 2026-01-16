@@ -40,6 +40,9 @@ const state = {
   nextId: 1,
   selectedId: null,
   selectedConnection: null,
+  selectedIds: new Set(),
+  selectedConnections: new Set(),
+  suppressNextCanvasClick: false,
   deleteMode: false,
   isPinching: false,
   isPanning: false,
@@ -172,6 +175,12 @@ const parseVariables = (text) => {
 function renderInspector(block) {
   if (!block) {
     inspectorBody.textContent = "Select a block or wire.";
+    if (rotateSelectionBtn) rotateSelectionBtn.disabled = true;
+    return;
+  }
+
+  if (block.kind === "multi") {
+    inspectorBody.textContent = `Selected ${block.blocks} blocks and ${block.connections} wires.`;
     if (rotateSelectionBtn) rotateSelectionBtn.disabled = true;
     return;
   }
@@ -1362,6 +1371,10 @@ function init() {
     }
     if (event.button !== 0) return;
     if (event.target.closest(".drag-handle") || event.target.closest(".port")) return;
+    if (event.ctrlKey && event.target === svg) {
+      renderer.startMarqueeSelection(event);
+      return;
+    }
     if (event.target !== svg) return;
     event.preventDefault();
     panStart = {
@@ -1428,6 +1441,10 @@ function init() {
   svg.addEventListener("pointercancel", endPinch);
 
   svg.addEventListener("click", (event) => {
+    if (state.suppressNextCanvasClick) {
+      state.suppressNextCanvasClick = false;
+      return;
+    }
     renderer.clearPending();
     renderer.selectBlock(null);
     renderer.selectConnection(null);

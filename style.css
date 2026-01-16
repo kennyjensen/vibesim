@@ -381,6 +381,14 @@ body::before {
   stroke-width: 2;
 }
 
+.svg-block.selected .block-body,
+.svg-block.selected .sum-circle,
+.svg-block.selected .gain-triangle,
+.svg-block.selected .file-icon-stroke {
+  stroke: #d17a3a;
+  stroke-width: 3;
+}
+
 .svg-block .block-text {
   font-size: 14px;
   font-weight: 700;
@@ -584,6 +592,14 @@ body::before {
 
 .selection-rect {
   fill: none;
+  stroke: #2b574a;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  pointer-events: none;
+}
+
+.selection-marquee {
+  fill: rgba(43, 87, 74, 0.1);
   stroke: #2b574a;
   stroke-width: 2;
   stroke-dasharray: 6 4;
