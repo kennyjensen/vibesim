@@ -1495,12 +1495,18 @@ function init() {
     let lastT = 0;
     let velocityX = 0;
     let collapsed = false;
+    let didDrag = false;
+    let suppressClickUntil = 0;
+    let totalDx = 0;
     const getViewportHeight = () => {
       const visualH = window.visualViewport?.height || 0;
       const innerH = window.innerHeight || 0;
       const docH = document.documentElement?.clientHeight || 0;
       return Math.max(visualH, innerH, docH);
     };
+    const getCarouselPanels = () => Array.from(
+      carousel.querySelectorAll(":scope > .toolbox, :scope > .panel-card, :scope > .right-column > .panel-card")
+    );
 
     const setCollapsed = (next) => {
       collapsed = next;
@@ -1519,12 +1525,12 @@ function init() {
     const onPointerDown = (event) => {
       if (!window.matchMedia("(max-width: 900px)").matches) return;
       if (!event.isPrimary) return;
-      if (event.target.closest("input, textarea, select, button, label")) return;
       const point = event.touches ? event.touches[0] : event;
       if (collapsed) {
         setCollapsed(false);
       }
       dragging = true;
+      didDrag = false;
       carousel.classList.add("dragging");
       startX = point.clientX;
       startY = point.clientY;
@@ -1532,6 +1538,7 @@ function init() {
       lastX = startX;
       lastT = performance.now();
       velocityX = 0;
+      totalDx = 0;
       try {
         carousel.setPointerCapture?.(event.pointerId);
       } catch (err) {
@@ -1544,7 +1551,11 @@ function init() {
       const point = event.touches ? event.touches[0] : event;
       const dx = point.clientX - startX;
       const dy = point.clientY - startY;
-      const axis = lockAxis(dx, dy);
+      totalDx = dx;
+      if (!didDrag && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+        didDrag = true;
+      }
+      const axis = Math.abs(dx) > 2 && Math.abs(dx) >= Math.abs(dy) * 0.4 ? "x" : lockAxis(dx, dy, 0.5);
       if (axis === "x") {
         event.preventDefault();
         carousel.scrollLeft = startScroll - dx * 2;
@@ -1553,13 +1564,6 @@ function init() {
         velocityX = (point.clientX - lastX) / dt;
         lastX = point.clientX;
         lastT = now;
-        if (carousel.scrollLeft < firstPanelOffset - 40) {
-          carousel.scrollLeft = lastPanelOffset;
-          startScroll = carousel.scrollLeft + dx * 2;
-        } else if (carousel.scrollLeft > lastPanelOffset + 40) {
-          carousel.scrollLeft = firstPanelOffset;
-          startScroll = carousel.scrollLeft + dx * 2;
-        }
       } else if (axis === "y") {
         if (!collapsed && shouldCollapse(dy, 20)) {
           setCollapsed(true);
@@ -1573,14 +1577,17 @@ function init() {
     const onPointerUp = () => {
       dragging = false;
       carousel.classList.remove("dragging");
+      if (didDrag) {
+        suppressClickUntil = performance.now() + 300;
+      }
       if (!window.matchMedia("(max-width: 900px)").matches) return;
       if (collapsed) return;
-      const cards = Array.from(carousel.children);
-      if (!cards.length) return;
-      const offsets = cards.map((card) => card.offsetLeft);
+      const panels = getCarouselPanels();
+      if (!panels.length) return;
+      const offsets = panels.map((panel) => panel.offsetLeft).sort((a, b) => a - b);
       const current = carousel.scrollLeft;
       const nearest = getSnapOffset(current, offsets);
-      const direction = velocityX < -0.4 ? 1 : velocityX > 0.4 ? -1 : 0;
+      const direction = velocityX < -0.4 ? 1 : velocityX > 0.4 ? -1 : totalDx < -20 ? 1 : totalDx > 20 ? -1 : 0;
       if (direction !== 0) {
         const idx = Math.max(0, Math.min(offsets.length - 1, offsets.indexOf(nearest) + direction));
         carousel.scrollTo({ left: offsets[idx], behavior: "smooth" });
@@ -1600,6 +1607,11 @@ function init() {
     carousel.addEventListener("pointercancel", onPointerUp, { passive: true, capture: true });
     carousel.addEventListener("click", (event) => {
       if (!window.matchMedia("(max-width: 900px)").matches) return;
+      if (performance.now() < suppressClickUntil) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       if (collapsed) {
         event.preventDefault();
         setCollapsed(false);
