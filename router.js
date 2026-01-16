@@ -764,6 +764,13 @@ export function routeAllConnections(
       obstacles,
       result,
       settings,
+      stats: {
+        nodes: nodes.length,
+        connections: connections.length,
+        prevWires: 0,
+        dirty: connections.length,
+        changed: connections.length,
+      },
     };
   }
   return applyRouter2Result(state, connections, result);
@@ -793,12 +800,24 @@ export function routeDirtyConnections(state, width, height, offset = { x: 0, y: 
     settings,
   });
   if (typeof window !== "undefined") {
+    const prevCount = prevSolution?.wires
+      ? prevSolution.wires instanceof Map
+        ? prevSolution.wires.size
+        : Object.keys(prevSolution.wires).length
+      : 0;
     window.__routerLast = {
       nodes,
       connections,
       obstacles,
       result,
       settings,
+      stats: {
+        nodes: nodes.length,
+        connections: connections.length,
+        prevWires: prevCount,
+        dirty: dirtySet?.size ?? 0,
+        changed: changedConnections.size,
+      },
     };
   }
   return applyRouter2Result(state, connections, result);

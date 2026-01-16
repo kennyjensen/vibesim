@@ -7,6 +7,7 @@ const blockLayer = document.getElementById("blockLayer");
 const wireLayer = document.getElementById("wireLayer");
 const overlayLayer = document.getElementById("overlayLayer");
 const runBtn = document.getElementById("runBtn");
+const runButtons = document.querySelectorAll('[data-action="run"]');
 const fullRouteBtn = document.getElementById("fullRouteBtn");
 const clearBtn = document.getElementById("clearBtn");
 const saveBtn = document.getElementById("saveBtn");
@@ -76,11 +77,15 @@ const renderer = createRenderer({
   },
 });
 
-if (fullRouteBtn) {
-  fullRouteBtn.addEventListener("click", () => {
-    renderer.forceFullRoute(2000);
-  });
-}
+  if (fullRouteBtn) {
+    fullRouteBtn.addEventListener("click", () => {
+      try {
+        renderer.forceFullRoute(2000);
+      } catch (error) {
+        statusEl.textContent = `Reroute error: ${error?.message || error}`;
+      }
+    });
+  }
 
 let zoomScale = 1;
 let viewBox = { x: 0, y: 0, w: 0, h: 0 };
@@ -293,6 +298,12 @@ function renderInspector(block) {
       <label class="param">y max
         <input type="text" data-edit="yMax" value="${block.params.yMax ?? ""}">
       </label>
+      <label class="param">Width
+        <input type="number" data-edit="width" value="${block.params.width ?? block.width}" min="160" step="10">
+      </label>
+      <label class="param">Height
+        <input type="number" data-edit="height" value="${block.params.height ?? block.height}" min="120" step="10">
+      </label>
     `;
     ["tMin", "tMax", "yMin", "yMax"].forEach((key) => {
       const input = inspectorBody.querySelector(`input[data-edit='${key}']`);
@@ -300,6 +311,16 @@ function renderInspector(block) {
       input.addEventListener("input", () => {
         block.params[key] = input.value;
         renderScope(block);
+      });
+    });
+    ["width", "height"].forEach((key) => {
+      const input = inspectorBody.querySelector(`input[data-edit='${key}']`);
+      if (!input) return;
+      input.addEventListener("change", () => {
+        const widthValue = Number(inspectorBody.querySelector("[data-edit='width']")?.value);
+        const heightValue = Number(inspectorBody.querySelector("[data-edit='height']")?.value);
+        renderer.resizeBlock(block, widthValue, heightValue);
+        input.value = key === "width" ? block.width : block.height;
       });
     });
   } else if (block.type === "chirp") {
@@ -889,7 +910,7 @@ function parseYAML(text) {
   const parseBlock = (indentLevel) => {
     const current = lines[index];
     if (!current) return { value: null, next: index };
-    if (current.text.startsWith("- ")) return parseArray(indentLevel);
+    if (current.text.startsWith("- ") || current.text === "-") return parseArray(indentLevel);
     return parseObject(indentLevel);
   };
 
@@ -897,8 +918,8 @@ function parseYAML(text) {
     const arr = [];
     while (index < lines.length) {
       const line = lines[index];
-      if (line.indent < indentLevel || !line.text.startsWith("- ")) break;
-      const itemText = line.text.slice(2).trim();
+      if (line.indent < indentLevel || !(line.text.startsWith("- ") || line.text === "-")) break;
+      const itemText = line.text === "-" ? "" : line.text.slice(2).trim();
       if (!itemText) {
         index += 1;
         const next = nextNonEmpty(index);
@@ -949,7 +970,7 @@ function parseYAML(text) {
     const obj = {};
     while (index < lines.length) {
       const line = lines[index];
-      if (line.indent < indentLevel || line.text.startsWith("- ")) break;
+      if (line.indent < indentLevel || line.text.startsWith("- ") || line.text === "-") break;
       const [rawKey, ...rest] = line.text.split(":");
       const key = rawKey.trim();
       const valueRaw = rest.join(":").trim();
@@ -1220,7 +1241,12 @@ function init() {
     });
   });
 
-  runBtn.addEventListener("click", () => simulate({ state, runtimeInput, statusEl }));
+  const handleRun = () => simulate({ state, runtimeInput, statusEl });
+  if (runButtons.length) {
+    runButtons.forEach((button) => button.addEventListener("click", handleRun));
+  } else if (runBtn) {
+    runBtn.addEventListener("click", handleRun);
+  }
   clearBtn.addEventListener("click", clearWorkspace);
 
   if (saveBtn) {

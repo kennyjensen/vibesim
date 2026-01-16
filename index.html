@@ -19,7 +19,7 @@
   <header class="topbar">
     <div class="brand">
       <div class="brand-title">Vibesim</div>
-      <div class="version">v0.1.239</div>
+      <div class="brand-subtitle">A block diagram control system simulator</div>
     </div>
   </header>
 
@@ -27,7 +27,7 @@
     <div class="panel-carousel">
       <aside id="blockLibrary" class="toolbox panel panel-left">
         <h2>Block Library</h2>
-        <details class="tool-group" open>
+        <details class="tool-group">
           <summary>Source</summary>
           <button class="tool" data-type="constant">Constant</button>
           <button class="tool" data-type="step">Step</button>
@@ -39,7 +39,7 @@
           <button class="tool" data-type="fileSource">File</button>
           <button class="tool" data-type="labelSource">Label</button>
         </details>
-        <details class="tool-group" open>
+        <details class="tool-group">
           <summary>Continuous</summary>
           <button class="tool" data-type="integrator">Integrator</button>
           <button class="tool" data-type="tf">Transfer Function</button>
@@ -50,13 +50,13 @@
           <button class="tool" data-type="derivative">Derivative</button>
           <button class="tool" data-type="pid">PID</button>
         </details>
-        <details class="tool-group" open>
+        <details class="tool-group">
           <summary>Math</summary>
           <button class="tool" data-type="gain">Gain</button>
           <button class="tool" data-type="sum">Addition</button>
           <button class="tool" data-type="mult">Multiplication</button>
         </details>
-        <details class="tool-group" open>
+        <details class="tool-group">
           <summary>Discrete</summary>
           <button class="tool" data-type="zoh">ZOH</button>
           <button class="tool" data-type="foh">FOH</button>
@@ -64,13 +64,13 @@
           <button class="tool" data-type="ddelay">Discrete Delay</button>
           <button class="tool" data-type="dstateSpace">Discrete State Space</button>
         </details>
-        <details class="tool-group" open>
+        <details class="tool-group">
           <summary>Nonlinear</summary>
           <button class="tool" data-type="saturation">Saturation</button>
           <button class="tool" data-type="rate">Rate Limit</button>
           <button class="tool" data-type="backlash">Backlash</button>
         </details>
-        <details class="tool-group" open>
+        <details class="tool-group">
           <summary>Sink</summary>
           <button class="tool" data-type="scope">Scope</button>
           <button class="tool" data-type="fileSink">Output File</button>
@@ -78,41 +78,50 @@
         </details>
       </aside>
 
-      <div id="simPanel" class="panel-card sim-panel">
-        <h3>Sim Properties</h3>
-        <label class="runtime">Runtime (s)
-          <input id="runtimeInput" type="number" value="10" step="0.5" min="0.1">
-        </label>
-        <button id="loadBtn" class="secondary">Load</button>
-        <button id="saveBtn" class="secondary">Save</button>
-        <button id="clearBtn" class="danger">Clear</button>
-        <input id="loadInput" type="file" accept=".yaml,.yml,text/yaml" hidden>
-        <div id="status" class="status">Idle</div>
-      </div>
+      <div class="right-column">
+        <div id="simPanel" class="panel-card sim-panel">
+          <h3>Sim Properties</h3>
+          <div class="runtime-row">
+            <label class="runtime">Runtime (s)
+              <input id="runtimeInput" type="number" value="10" step="0.5" min="0.1">
+            </label>
+            <button class="secondary" data-action="run">Run</button>
+          </div>
+          <div class="button-row">
+            <button id="loadBtn" class="secondary">Load</button>
+            <button id="saveBtn" class="secondary">Save</button>
+            <button id="clearBtn" class="danger">Clear</button>
+          </div>
+          <input id="loadInput" type="file" accept=".yaml,.yml,text/yaml" hidden>
+          <div id="status" class="status">Idle</div>
+        </div>
 
-      <div id="inspector" class="inspector panel-card">
-        <h3>Block Properties</h3>
-        <div id="inspectorBody" class="inspector-body">Select a block or wire.</div>
-        <button id="rotateSelection" class="secondary">Rotate</button>
-        <button id="deleteSelection" class="danger">Delete</button>
-      </div>
-      <div id="variablesPanel" class="variables-panel panel-card">
-        <h3>Variables</h3>
-        <textarea id="variablesInput" rows="6" placeholder="k=2&#10;w=3.14"></textarea>
-        <button id="applyVariables" class="secondary">Apply</button>
-        <div id="variablesPreview" class="variables-preview"></div>
-      </div>
-      <div id="debugPanel" class="debug-panel panel-card">
-        <h3>Debug</h3>
-        <button id="copyDebug" class="secondary">Copy debug</button>
-        <pre id="debugLog">Routing debug output will appear here.</pre>
+        <div id="inspector" class="inspector panel-card">
+          <h3>Block Properties</h3>
+          <div id="inspectorBody" class="inspector-body">Select a block or wire.</div>
+          <div class="button-row">
+            <button id="rotateSelection" class="secondary">Rotate</button>
+            <button id="deleteSelection" class="danger">Delete</button>
+          </div>
+        </div>
+        <div id="variablesPanel" class="variables-panel panel-card">
+          <h3>Variables</h3>
+          <textarea id="variablesInput" rows="6" placeholder="k=2&#10;w=3.14"></textarea>
+          <button id="applyVariables" class="secondary">Apply</button>
+          <div id="variablesPreview" class="variables-preview"></div>
+        </div>
+        <div id="debugPanel" class="debug-panel panel-card">
+          <h3>Debug</h3>
+          <button id="copyDebug" class="secondary">Copy debug</button>
+          <pre id="debugLog">Routing debug output will appear here.</pre>
+        </div>
       </div>
     </div>
 
     <section class="workspace">
       <div id="canvas">
         <div class="floating-controls">
-          <button id="runBtn" class="floating-btn" aria-label="Run" title="Run">
+          <button id="runBtn" class="floating-btn" aria-label="Run" title="Run" data-action="run">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M7 5l12 7-12 7z" />
             </svg>

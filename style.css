@@ -5,6 +5,7 @@
   --accent-2: #d17a3a;
   --text: #1b1a17;
   --wire: #2b3c63;
+  --topbar-height: 48px;
 }
 
 * { box-sizing: border-box; }
@@ -15,6 +16,7 @@ body {
   background: radial-gradient(circle at 20% 20%, #fff9f1 0, #f3efe7 50%, #e8dfcf 100%);
   color: var(--text);
   min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
 }
@@ -36,6 +38,7 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  height: var(--topbar-height);
   padding: 8px 14px;
   background: var(--panel);
   border-bottom: 2px solid #d6c3a4;
@@ -48,8 +51,14 @@ body::before {
 }
 
 .brand-title {
-  font-weight: 700;
+  font-weight: 800;
+  font-size: 1.4rem;
   letter-spacing: 0.5px;
+}
+
+.brand-subtitle {
+  font-size: 0.85rem;
+  opacity: 0.75;
 }
 
 .controls {
@@ -63,10 +72,22 @@ body::before {
   align-items: center;
   gap: 6px;
   font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.runtime-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.runtime-row .runtime {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .runtime input {
-  width: 70px;
+  width: 100%;
   padding: 4px 6px;
   border-radius: 6px;
   border: 1px solid #9c8c73;
@@ -96,25 +117,20 @@ body::before {
   opacity: 0.8;
 }
 
-.version {
-  font-size: 0.8rem;
-  opacity: 0.7;
-}
 
 
 .layout {
   display: grid;
-  grid-template-columns: 240px 1fr 320px;
-  grid-template-rows: min-content min-content 1fr;
+  grid-template-columns: 240px 1fr minmax(260px, 25%);
+  grid-template-rows: 1fr;
   grid-template-areas:
-    "library workspace sim"
-    "library workspace properties"
-    "library workspace variables"
-    "library workspace debug";
+    "library workspace right";
   min-height: 0;
+  height: calc(100vh - var(--topbar-height));
   flex: 1;
   gap: 12px;
   padding: 12px;
+  overflow: hidden;
 }
 
 .panel-carousel {
@@ -125,8 +141,16 @@ body::before {
   grid-area: library;
 }
 
+.right-column {
+  grid-area: right;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow: auto;
+}
+
 .sim-panel {
-  grid-area: sim;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -134,6 +158,26 @@ body::before {
 
 .sim-panel .secondary {
   width: 100%;
+}
+
+.runtime-row .secondary {
+  padding: 8px 12px;
+  white-space: nowrap;
+  width: auto;
+  flex: 0 0 33%;
+  margin-top: 0;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+}
+
+.button-row .secondary,
+.button-row .danger {
+  width: auto;
+  flex: 1;
+  margin-top: 0;
 }
 
 .inspector {
@@ -153,6 +197,8 @@ body::before {
   background: linear-gradient(180deg, #efe3cf 0, #e1d0b7 100%);
   border: 2px solid #d6c3a4;
   border-radius: 12px;
+  max-height: 100%;
+  overflow: auto;
 }
 
 .toolbox h2,
@@ -339,6 +385,13 @@ body::before {
   font-size: 14px;
   font-weight: 700;
   fill: #1b1a17;
+}
+
+.resize-handle {
+  fill: #f7e9d5;
+  stroke: #3c3c3c;
+  stroke-width: 2;
+  cursor: nwse-resize;
 }
 
 .block-text.label-large {
@@ -682,6 +735,23 @@ body::before {
   gap: 8px;
 }
 
+.inspector .button-row {
+  margin-top: 10px;
+}
+
+.param {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  white-space: nowrap;
+  align-self: flex-start;
+}
+
+.param > input,
+.param > select {
+  width: 100%;
+}
+
 #errorBox {
   margin: 6px 0 0 0;
   background: #fff3f2;
@@ -745,12 +815,27 @@ body::before {
     z-index: 30;
   }
 
+  .right-column {
+    display: contents;
+  }
+
   .panel-carousel.dragging {
     scroll-behavior: auto;
     cursor: grabbing;
   }
 
   .panel-carousel > * {
+    min-width: 85vw;
+    max-width: 85vw;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    flex: 0 0 auto;
+    height: calc(var(--carousel-height, 64px) - 16px);
+    overflow: hidden;
+    touch-action: none;
+  }
+
+  .panel-carousel .right-column > * {
     min-width: 85vw;
     max-width: 85vw;
     scroll-snap-align: start;
@@ -773,7 +858,16 @@ body::before {
     overflow: hidden;
   }
 
+  .panel-carousel.collapsed .right-column > * {
+    height: calc(var(--carousel-height, 64px) - 16px);
+    overflow: hidden;
+  }
+
   .panel-carousel.collapsed > * > :not(h2):not(h3) {
+    display: none;
+  }
+
+  .panel-carousel.collapsed .right-column > * > :not(h2):not(h3) {
     display: none;
   }
 
