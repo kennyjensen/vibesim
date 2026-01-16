@@ -17,6 +17,7 @@ const statusEl = document.getElementById("status");
 const runtimeInput = document.getElementById("runtimeInput");
 const inspectorBody = document.getElementById("inspectorBody");
 const deleteSelectionBtn = document.getElementById("deleteSelection");
+const examplesList = document.getElementById("examplesList");
 const rotateSelectionBtn = document.getElementById("rotateSelection");
 const errorBox = document.getElementById("errorBox");
 const debugPanel = document.getElementById("debugPanel");
@@ -60,6 +61,8 @@ const state = {
   variablesText: "",
   variablesDisplay: [],
 };
+
+let fitToDiagram = () => {};
 
 const focusPropertiesPanel = () => {
   if (!window.matchMedia("(max-width: 900px)").matches) return;
@@ -830,6 +833,7 @@ function loadDiagram(data) {
   });
 
   renderer.updateConnections(true);
+  fitToDiagram();
 }
 
 function toYAML(data) {
@@ -1011,6 +1015,31 @@ function parseYAML(text) {
 }
 
 function init() {
+  const exampleFiles = ["examples/inverted_pendulum.yaml"];
+  if (examplesList) {
+    examplesList.innerHTML = "";
+    exampleFiles.forEach((path) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "secondary";
+      const label = path.split("/").pop()?.replace(/_/g, " ").replace(/\.ya?ml$/i, "") || path;
+      button.textContent = label.replace(/\b\w/g, (char) => char.toUpperCase());
+      button.addEventListener("click", async () => {
+        statusEl.textContent = "Loading example...";
+        try {
+          const response = await fetch(path, { cache: "no-store" });
+          if (!response.ok) throw new Error(`Failed to load ${path}`);
+          const text = await response.text();
+          const data = parseYAML(text);
+          loadDiagram(data);
+          statusEl.textContent = "Loaded example";
+        } catch (error) {
+          statusEl.textContent = `Example load error: ${error?.message || error}`;
+        }
+      });
+      examplesList.appendChild(button);
+    });
+  }
   const initViewBox = () => {
     const { w, h } = getViewportSize();
     if (viewBox.w === 0 || viewBox.h === 0) {
@@ -1065,7 +1094,7 @@ function init() {
     updateGrid(canvas, scale, viewBox);
   };
 
-  const fitToDiagram = () => {
+  fitToDiagram = () => {
     if (state.blocks.size === 0) {
       initViewBox();
       return;

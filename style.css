@@ -156,6 +156,18 @@ body::before {
   gap: 8px;
 }
 
+.examples-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.button-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .sim-panel .secondary {
   width: 100%;
 }

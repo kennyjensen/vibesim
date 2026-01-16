@@ -1,0 +1,141 @@
+version: 1
+blocks:
+  -
+    id: b2
+    type: sum
+    x: 2000
+    y: 1460
+    rotation: 0
+    params:
+      signs:
+        - 1
+        - -1
+        - 1
+  -
+    id: b3
+    type: pid
+    x: 2080
+    y: 1430
+    rotation: 0
+    params:
+      kp: 5
+      ki: 2
+      kd: 1
+  -
+    id: b4
+    type: tf
+    x: 2200
+    y: 1430
+    rotation: 0
+    params:
+      num:
+        - 1
+      den:
+        - I
+        - 0
+        - mg
+  -
+    id: b6
+    type: labelSource
+    x: 1870
+    y: 1450
+    rotation: 0
+    params:
+      name: u
+  -
+    id: b7
+    type: labelSink
+    x: 2470
+    y: 1450
+    rotation: 0
+    params:
+      name: "\\theta"
+      showNode: true
+  -
+    id: b8
+    type: step
+    x: 1890
+    y: 1610
+    rotation: 0
+    params:
+      stepTime: 1
+  -
+    id: b9
+    type: labelSink
+    x: 2050
+    y: 1630
+    rotation: 0
+    params:
+      name: u
+      showNode: true
+  -
+    id: b10
+    type: scope
+    x: 2270
+    y: 1610
+    rotation: 0
+    params:
+      tMin: ""
+      tMax: ""
+      yMin: ""
+      yMax: ""
+      width: 310
+      height: 310
+  -
+    id: b11
+    type: labelSource
+    x: 2140
+    y: 1630
+    rotation: 0
+    params:
+      name: u
+  -
+    id: b12
+    type: labelSource
+    x: 2140
+    y: 1750
+    rotation: 0
+    params:
+      name: "\\theta"
+connections:
+  -
+    from: b2
+    to: b3
+    fromIndex: 0
+    toIndex: 0
+  -
+    from: b3
+    to: b4
+    fromIndex: 0
+    toIndex: 0
+  -
+    from: b4
+    to: b2
+    fromIndex: 0
+    toIndex: 1
+  -
+    from: b6
+    to: b2
+    fromIndex: 0
+    toIndex: 0
+  -
+    from: b4
+    to: b7
+    fromIndex: 0
+    toIndex: 0
+  -
+    from: b8
+    to: b9
+    fromIndex: 0
+    toIndex: 0
+  -
+    from: b11
+    to: b10
+    fromIndex: 0
+    toIndex: 0
+  -
+    from: b12
+    to: b10
+    fromIndex: 0
+    toIndex: 1
+variables: "m=1\ng=9.81\nI=m\nmg=m*g\nk=1"
