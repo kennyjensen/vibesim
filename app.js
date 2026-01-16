@@ -19,6 +19,11 @@ const inspectorBody = document.getElementById("inspectorBody");
 const deleteSelectionBtn = document.getElementById("deleteSelection");
 const rotateSelectionBtn = document.getElementById("rotateSelection");
 const errorBox = document.getElementById("errorBox");
+const debugPanel = document.getElementById("debugPanel");
+
+const DEBUG_UI = false;
+
+if (debugPanel) debugPanel.hidden = !DEBUG_UI;
 
 if (rotateSelectionBtn) rotateSelectionBtn.disabled = true;
 
