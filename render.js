@@ -1285,7 +1285,7 @@ const blockTemplates = {
       { x: 0, y: 120, side: "left" },
     ],
     outputs: [],
-    defaultParams: {},
+    defaultParams: { tMin: "", tMax: "", yMin: "", yMax: "" },
     render: (block) => {
       const group = block.group;
       group.appendChild(svgRect(0, 0, block.width, block.height, "block-body"));

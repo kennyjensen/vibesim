@@ -14,13 +14,29 @@ body {
   font-family: "Trebuchet MS", "Segoe UI", sans-serif;
   background: radial-gradient(circle at 20% 20%, #fff9f1 0, #f3efe7 50%, #e8dfcf 100%);
   color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+html {
+  background: radial-gradient(circle at 20% 20%, #fff9f1 0, #f3efe7 50%, #e8dfcf 100%);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  height: 100lvh;
+  background: #ffffff;
+  z-index: -1;
 }
 
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 20px;
+  padding: 8px 14px;
   background: var(--panel);
   border-bottom: 2px solid #d6c3a4;
 }
@@ -39,14 +55,14 @@ body {
 .controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .runtime {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .runtime input {
@@ -85,20 +101,64 @@ body {
   opacity: 0.7;
 }
 
+
 .layout {
   display: grid;
-  grid-template-columns: 220px 1fr;
-  min-height: calc(100vh - 58px);
+  grid-template-columns: 240px 1fr 320px;
+  grid-template-rows: min-content min-content 1fr;
+  grid-template-areas:
+    "library workspace sim"
+    "library workspace properties"
+    "library workspace variables"
+    "library workspace debug";
+  min-height: 0;
+  flex: 1;
+  gap: 12px;
+  padding: 12px;
+}
+
+.panel-carousel {
+  display: contents;
+}
+
+.toolbox {
+  grid-area: library;
+}
+
+.sim-panel {
+  grid-area: sim;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sim-panel .secondary {
+  width: 100%;
+}
+
+.inspector {
+  grid-area: properties;
+}
+
+.variables-panel {
+  grid-area: variables;
+}
+
+.debug-panel {
+  grid-area: debug;
 }
 
 .toolbox {
   padding: 16px;
   background: linear-gradient(180deg, #efe3cf 0, #e1d0b7 100%);
-  border-right: 2px solid #d6c3a4;
+  border: 2px solid #d6c3a4;
+  border-radius: 12px;
 }
 
-.toolbox h2 {
-  margin-top: 0;
+.toolbox h2,
+.panel-carousel h2,
+.panel-carousel h3 {
+  margin: 0 0 8px 0;
   font-size: 1.1rem;
 }
 
@@ -147,16 +207,11 @@ body {
   opacity: 0.8;
 }
 
-.inspector {
-  margin-top: 12px;
-  border-top: 2px solid #d6c3a4;
-  padding-top: 12px;
-}
-
-.debug-panel {
-  margin-top: 12px;
-  border-top: 2px solid #d6c3a4;
-  padding-top: 12px;
+.panel-card {
+  padding: 12px;
+  background: #f7eddf;
+  border: 1px solid #c6b391;
+  border-radius: 8px;
 }
 
 .debug-panel h3 {
@@ -185,18 +240,7 @@ body {
   cursor: pointer;
 }
 
-.inspector .danger {
-  margin-top: 10px;
-  width: 100%;
-  border: 2px solid #7c2c2c;
-  background: #7c2c2c;
-  color: #fff;
-  padding: 8px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.inspector .secondary {
+.secondary {
   margin-top: 10px;
   width: 100%;
   border: 2px solid #2b574a;
@@ -207,13 +251,29 @@ body {
   cursor: pointer;
 }
 
+.danger {
+  margin-top: 10px;
+  width: 100%;
+  border: 2px solid #7c2c2c;
+  background: #7c2c2c;
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
 .workspace {
-  padding: 12px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  grid-area: workspace;
 }
 
 #canvas {
   position: relative;
-  height: calc(100vh - 90px);
+  height: 100%;
+  flex: 1;
+  min-height: 0;
   border: 2px dashed #cbb79a;
   background-color: #ffffff;
   background-image:
@@ -231,6 +291,7 @@ body {
   display: flex;
   gap: 10px;
   z-index: 5;
+  flex-wrap: wrap;
 }
 
 .floating-btn {
@@ -264,6 +325,7 @@ body {
 #svgCanvas {
   width: 100%;
   height: 100%;
+  display: block;
   touch-action: none;
 }
 
@@ -581,19 +643,11 @@ body {
 .scope-label-3 { fill: #ff49c9; }
 
 .inspector {
-  margin-top: 16px;
-  padding: 12px;
-  background: #f7eddf;
-  border: 1px solid #c6b391;
-  border-radius: 8px;
+  margin: 0;
 }
 
 .variables-panel {
-  margin-top: 12px;
-  padding: 12px;
-  background: #f7eddf;
-  border: 1px solid #c6b391;
-  border-radius: 8px;
+  margin: 0;
 }
 
 .variables-panel textarea {
@@ -639,22 +693,119 @@ body {
 }
 
 @media (max-width: 900px) {
+  html, body {
+    touch-action: pan-y;
+    overflow: hidden;
+    overscroll-behavior: none;
+    background: #ffffff;
+  }
+
+  .topbar {
+    display: none;
+  }
+
   .layout {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100svh;
+    height: 100dvh;
+    height: 100lvh;
+    padding: 0;
+    gap: 0;
+    position: relative;
+  }
+
+  .runtime input {
+    width: 60px;
+  }
+
+  .panel-carousel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    order: 3;
+    gap: 12px;
+    padding: 8px 10px;
+    background: var(--panel);
+    border-top: 2px solid #d6c3a4;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scroll-padding: 0 10px;
+    -webkit-overflow-scrolling: touch;
+    height: calc(var(--carousel-height, 64px) + env(safe-area-inset-bottom));
+    touch-action: none;
+    overscroll-behavior-x: contain;
+    scroll-behavior: smooth;
+    scroll-padding: 0 10px;
+    transition: none;
+    z-index: 30;
+  }
+
+  .panel-carousel.dragging {
+    scroll-behavior: auto;
+    cursor: grabbing;
+  }
+
+  .panel-carousel > * {
+    min-width: 85vw;
+    max-width: 85vw;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    flex: 0 0 auto;
+    height: calc(var(--carousel-height, 64px) - 16px);
+    overflow: hidden;
+    touch-action: none;
+  }
+
+  .panel-carousel.collapsed {
+    height: calc(var(--carousel-height, 64px) + env(safe-area-inset-bottom));
+    padding-top: 6px;
+    padding-bottom: 6px;
+    transition: none;
+  }
+
+  .panel-carousel.collapsed > * {
+    height: calc(var(--carousel-height, 64px) - 16px);
+    overflow: hidden;
+  }
+
+  .panel-carousel.collapsed > * > :not(h2):not(h3) {
+    display: none;
+  }
+
+  .panel-carousel.collapsed h2,
+  .panel-carousel.collapsed h3 {
+    margin: 0;
+    font-size: 1rem;
   }
 
   .toolbox {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+    border: 1px solid #c6b391;
   }
 
-  .toolbox .tool {
-    width: auto;
-    flex: 1 1 30%;
+  .panel-carousel .toolbox {
+    background: #f7eddf;
+    overflow: auto;
+    touch-action: pan-y;
+  }
+
+  .workspace {
+    order: 2;
+    flex: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--carousel-height, 64px) + env(safe-area-inset-bottom));
+    padding: 8px 10px;
+    height: calc(100lvh - var(--carousel-height, 64px) - env(safe-area-inset-bottom));
   }
 
   #canvas {
-    height: calc(100vh - 220px);
+    height: 100%;
   }
 }

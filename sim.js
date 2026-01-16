@@ -590,6 +590,17 @@ export function renderScope(scopeBlock) {
   const plotW = Number(plot.getAttribute("width"));
   const plotH = Number(plot.getAttribute("height"));
   const axes = scopeBlock.scopeAxes;
+  const parseLimit = (value) => {
+    if (value == null) return null;
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      const num = Number(trimmed);
+      return Number.isFinite(num) ? num : null;
+    }
+    return null;
+  };
   const niceStep = (range, target = 5) => {
     if (!Number.isFinite(range) || range <= 0) return 1;
     const raw = range / target;
@@ -619,13 +630,19 @@ export function renderScope(scopeBlock) {
 
   let maxVal = Math.max(...values, 1);
   let minVal = Math.min(...values, -1);
+  const yMinParam = parseLimit(scopeBlock.params?.yMin);
+  const yMaxParam = parseLimit(scopeBlock.params?.yMax);
+  if (yMinParam != null) minVal = yMinParam;
+  if (yMaxParam != null) maxVal = yMaxParam;
   if (maxVal === minVal) {
     maxVal += 1;
     minVal -= 1;
   }
-  const maxAbs = Math.max(Math.abs(maxVal), Math.abs(minVal), 1e-6);
-  maxVal = maxAbs * 1.2;
-  minVal = -maxAbs * 1.2;
+  if (yMinParam == null && yMaxParam == null) {
+    const maxAbs = Math.max(Math.abs(maxVal), Math.abs(minVal), 1e-6);
+    maxVal = maxAbs * 1.2;
+    minVal = -maxAbs * 1.2;
+  }
   const range = maxVal - minVal;
 
   if (axes) {
@@ -655,8 +672,12 @@ export function renderScope(scopeBlock) {
       tick.setAttribute("x2", plotX + tickLen);
       tick.setAttribute("y2", y);
     });
-    const t0 = Number(time[0] ?? 0);
-    const t1 = Number(time[time.length - 1] ?? t0);
+    const t0Raw = Number(time[0] ?? 0);
+    const t1Raw = Number(time[time.length - 1] ?? t0Raw);
+    const tMinParam = parseLimit(scopeBlock.params?.tMin);
+    const tMaxParam = parseLimit(scopeBlock.params?.tMax);
+    const t0 = tMinParam != null ? tMinParam : t0Raw;
+    const t1 = tMaxParam != null ? tMaxParam : t1Raw;
     const tRange = t1 - t0;
     const xStep = niceStep(Math.max(1e-6, tRange), 5);
     const xTicks = tRange <= 0 ? [t0] : buildTicks(t0, t1, xStep);
@@ -685,7 +706,17 @@ export function renderScope(scopeBlock) {
     const path = valuesForSeries
       .map((v, i) => {
         if (v == null) return null;
-        const x = plotX + (i / (valuesForSeries.length - 1)) * plotW;
+        const t0Raw = Number(time[0] ?? 0);
+        const t1Raw = Number(time[time.length - 1] ?? t0Raw);
+        const tMinParam = parseLimit(scopeBlock.params?.tMin);
+        const tMaxParam = parseLimit(scopeBlock.params?.tMax);
+        const t0 = tMinParam != null ? tMinParam : t0Raw;
+        const t1 = tMaxParam != null ? tMaxParam : t1Raw;
+        const tRange = t1 - t0;
+        const t = Number(time[i] ?? t0);
+        const ratio = tRange <= 0 ? (valuesForSeries.length <= 1 ? 0 : i / (valuesForSeries.length - 1)) : (t - t0) / tRange;
+        const clamped = Math.max(0, Math.min(1, ratio));
+        const x = plotX + clamped * plotW;
         const y = plotY + plotH - ((v - minVal) / range) * plotH;
         return `${i === 0 ? "M" : "L"} ${x} ${y}`;
       })
@@ -701,8 +732,15 @@ export function renderScope(scopeBlock) {
   const primary = primaryIndex >= 0 ? series[primaryIndex] : series[0] || [];
   if (primary.length < 2) return;
   const idx = Math.min(primary.length - 1, Math.max(0, Math.round(ratio * (primary.length - 1))));
-  const t = time[idx];
-  const x = plotX + (idx / (primary.length - 1)) * plotW;
+  const t0Raw = Number(time[0] ?? 0);
+  const t1Raw = Number(time[time.length - 1] ?? t0Raw);
+  const tMinParam = parseLimit(scopeBlock.params?.tMin);
+  const tMaxParam = parseLimit(scopeBlock.params?.tMax);
+  const t0 = tMinParam != null ? tMinParam : t0Raw;
+  const t1 = tMaxParam != null ? tMaxParam : t1Raw;
+  const tRange = t1 - t0;
+  const t = tRange <= 0 ? Number(time[idx] ?? t0) : t0 + ratio * tRange;
+  const x = plotX + ratio * plotW;
 
   scopeBlock.scopeCursor?.remove();
   if (scopeBlock.scopeLabels) scopeBlock.scopeLabels.forEach((el) => el.remove());

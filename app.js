@@ -1,5 +1,6 @@
 import { createRenderer } from "./render.js";
-import { simulate } from "./sim.js";
+import { simulate, renderScope } from "./sim.js";
+import { getSnapOffset, shouldCollapse, shouldExpand, lockAxis } from "./carousel-utils.js";
 
 const svg = document.getElementById("svgCanvas");
 const blockLayer = document.getElementById("blockLayer");
@@ -51,14 +52,28 @@ const state = {
   variablesDisplay: [],
 };
 
+const focusPropertiesPanel = () => {
+  if (!window.matchMedia("(max-width: 900px)").matches) return;
+  const carousel = document.querySelector(".panel-carousel");
+  const inspector = document.getElementById("inspector");
+  if (!carousel || !inspector) return;
+  carousel.scrollTo({ left: inspector.offsetLeft, behavior: "smooth" });
+};
+
 const renderer = createRenderer({
   svg,
   blockLayer,
   wireLayer,
   overlayLayer,
   state,
-  onSelectBlock: renderInspector,
-  onSelectConnection: renderInspector,
+  onSelectBlock: (blockId) => {
+    renderInspector(blockId);
+    focusPropertiesPanel();
+  },
+  onSelectConnection: (connectionId) => {
+    renderInspector(connectionId);
+    focusPropertiesPanel();
+  },
 });
 
 if (fullRouteBtn) {
@@ -69,6 +84,17 @@ if (fullRouteBtn) {
 
 let zoomScale = 1;
 let viewBox = { x: 0, y: 0, w: 0, h: 0 };
+
+const getViewportSize = () => {
+  const canvas = document.getElementById("canvas");
+  if (canvas) {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width && rect.height) {
+      return { w: rect.width, h: rect.height };
+    }
+  }
+  return { w: svg.clientWidth || 1, h: svg.clientHeight || 1 };
+};
 const pointers = new Map();
 let pinchStart = null;
 let panStart = null;
@@ -252,6 +278,29 @@ function renderInspector(block) {
     phaseInput.addEventListener("input", () => {
       block.params.phase = phaseInput.value;
       renderer.updateBlockLabel(block);
+    });
+  } else if (block.type === "scope") {
+    inspectorBody.innerHTML = `
+      <label class="param">t min
+        <input type="text" data-edit="tMin" value="${block.params.tMin ?? ""}">
+      </label>
+      <label class="param">t max
+        <input type="text" data-edit="tMax" value="${block.params.tMax ?? ""}">
+      </label>
+      <label class="param">y min
+        <input type="text" data-edit="yMin" value="${block.params.yMin ?? ""}">
+      </label>
+      <label class="param">y max
+        <input type="text" data-edit="yMax" value="${block.params.yMax ?? ""}">
+      </label>
+    `;
+    ["tMin", "tMax", "yMin", "yMax"].forEach((key) => {
+      const input = inspectorBody.querySelector(`input[data-edit='${key}']`);
+      if (!input) return;
+      input.addEventListener("input", () => {
+        block.params[key] = input.value;
+        renderScope(block);
+      });
     });
   } else if (block.type === "chirp") {
     inspectorBody.innerHTML = `
@@ -928,8 +977,7 @@ function parseYAML(text) {
 
 function init() {
   const initViewBox = () => {
-    const w = svg.clientWidth || 1;
-    const h = svg.clientHeight || 1;
+    const { w, h } = getViewportSize();
     if (viewBox.w === 0 || viewBox.h === 0) {
       zoomScale = 1.5;
       const vbW = w / zoomScale;
@@ -955,8 +1003,7 @@ function init() {
   };
 
   const updateViewBox = (scale, center = null) => {
-    const w = svg.clientWidth || 1;
-    const h = svg.clientHeight || 1;
+    const { w, h } = getViewportSize();
     const currentCenter = center || { x: viewBox.x + viewBox.w / 2, y: viewBox.y + viewBox.h / 2 };
     const newW = w / scale;
     const newH = h / scale;
@@ -967,8 +1014,7 @@ function init() {
   };
 
   const updateViewBoxWithAnchor = (scale, anchor, baseViewBox = viewBox) => {
-    const w = svg.clientWidth || 1;
-    const h = svg.clientHeight || 1;
+    const { w, h } = getViewportSize();
     const newW = w / scale;
     const newH = h / scale;
     const relX = (anchor.x - baseViewBox.x) / baseViewBox.w;
@@ -1006,8 +1052,7 @@ function init() {
     maxY += pad;
     const boundsW = Math.max(1, maxX - minX);
     const boundsH = Math.max(1, maxY - minY);
-    const w = svg.clientWidth || 1;
-    const h = svg.clientHeight || 1;
+    const { w, h } = getViewportSize();
     const scale = Math.max(0.1, Math.min(3, Math.min(w / boundsW, h / boundsH)));
     zoomScale = scale;
     updateViewBox(scale, { x: minX + boundsW / 2, y: minY + boundsH / 2 });
@@ -1366,6 +1411,175 @@ function init() {
     initViewBox();
     renderer.updateConnections(true);
   });
+
+  const canvasEl = document.getElementById("canvas");
+  if (canvasEl && "ResizeObserver" in window) {
+    let resizeRaf = 0;
+    let lastSize = { w: 0, h: 0 };
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      const rect = entry?.contentRect;
+      const w = rect?.width || canvasEl.clientWidth || 0;
+      const h = rect?.height || canvasEl.clientHeight || 0;
+      if (!w || !h) return;
+      if (Math.abs(w - lastSize.w) < 0.5 && Math.abs(h - lastSize.h) < 0.5) return;
+      lastSize = { w, h };
+      if (resizeRaf) cancelAnimationFrame(resizeRaf);
+      resizeRaf = requestAnimationFrame(() => {
+        initViewBox();
+        renderer.updateConnections(true);
+      });
+    });
+    ro.observe(canvasEl);
+  }
+
+  const collapseLibraryOnMobile = () => {
+    if (!window.matchMedia("(max-width: 900px)").matches) return;
+    document.querySelectorAll(".toolbox details").forEach((group) => {
+      group.open = false;
+    });
+  };
+  collapseLibraryOnMobile();
+
+  const initMobileCarousel = () => {
+    const carousel = document.querySelector(".panel-carousel");
+    if (!carousel) return;
+    let dragging = false;
+    let startX = 0;
+    let startY = 0;
+    let startScroll = 0;
+    let lastX = 0;
+    let lastT = 0;
+    let velocityX = 0;
+    let collapsed = false;
+    const getViewportHeight = () => {
+      const visualH = window.visualViewport?.height || 0;
+      const innerH = window.innerHeight || 0;
+      const docH = document.documentElement?.clientHeight || 0;
+      return Math.max(visualH, innerH, docH);
+    };
+
+    const setCollapsed = (next) => {
+      collapsed = next;
+      carousel.classList.toggle("collapsed", collapsed);
+      const viewportH = getViewportHeight();
+      const expandedHeight = Math.max(200, Math.round(viewportH * 0.38));
+      const targetHeight = collapsed ? 64 : expandedHeight;
+      document.documentElement.style.setProperty("--carousel-height", `${targetHeight}px`);
+      carousel.style.transition = "none";
+      carousel.style.height = `${targetHeight}px`;
+      carousel.style.scrollBehavior = collapsed ? "auto" : "smooth";
+      carousel.offsetHeight;
+      carousel.style.transition = "";
+    };
+
+    const onPointerDown = (event) => {
+      if (!window.matchMedia("(max-width: 900px)").matches) return;
+      if (!event.isPrimary) return;
+      if (event.target.closest("input, textarea, select, button, label")) return;
+      const point = event.touches ? event.touches[0] : event;
+      if (collapsed) {
+        setCollapsed(false);
+      }
+      dragging = true;
+      carousel.classList.add("dragging");
+      startX = point.clientX;
+      startY = point.clientY;
+      startScroll = carousel.scrollLeft;
+      lastX = startX;
+      lastT = performance.now();
+      velocityX = 0;
+      try {
+        carousel.setPointerCapture?.(event.pointerId);
+      } catch (err) {
+        // Ignore capture failures.
+      }
+    };
+
+    const onPointerMove = (event) => {
+      if (!dragging) return;
+      const point = event.touches ? event.touches[0] : event;
+      const dx = point.clientX - startX;
+      const dy = point.clientY - startY;
+      const axis = lockAxis(dx, dy);
+      if (axis === "x") {
+        event.preventDefault();
+        carousel.scrollLeft = startScroll - dx * 2;
+        const now = performance.now();
+        const dt = Math.max(1, now - lastT);
+        velocityX = (point.clientX - lastX) / dt;
+        lastX = point.clientX;
+        lastT = now;
+        if (carousel.scrollLeft < firstPanelOffset - 40) {
+          carousel.scrollLeft = lastPanelOffset;
+          startScroll = carousel.scrollLeft + dx * 2;
+        } else if (carousel.scrollLeft > lastPanelOffset + 40) {
+          carousel.scrollLeft = firstPanelOffset;
+          startScroll = carousel.scrollLeft + dx * 2;
+        }
+      } else if (axis === "y") {
+        if (!collapsed && shouldCollapse(dy, 20)) {
+          setCollapsed(true);
+          dragging = false;
+        } else if (collapsed && shouldExpand(dy, 14)) {
+          setCollapsed(false);
+        }
+      }
+    };
+
+    const onPointerUp = () => {
+      dragging = false;
+      carousel.classList.remove("dragging");
+      if (!window.matchMedia("(max-width: 900px)").matches) return;
+      if (collapsed) return;
+      const cards = Array.from(carousel.children);
+      if (!cards.length) return;
+      const offsets = cards.map((card) => card.offsetLeft);
+      const current = carousel.scrollLeft;
+      const nearest = getSnapOffset(current, offsets);
+      const direction = velocityX < -0.4 ? 1 : velocityX > 0.4 ? -1 : 0;
+      if (direction !== 0) {
+        const idx = Math.max(0, Math.min(offsets.length - 1, offsets.indexOf(nearest) + direction));
+        carousel.scrollTo({ left: offsets[idx], behavior: "smooth" });
+        return;
+      }
+      carousel.scrollTo({ left: nearest, behavior: "smooth" });
+    };
+
+    const syncCarouselHeight = () => {
+      if (!window.matchMedia("(max-width: 900px)").matches) return;
+      setCollapsed(collapsed);
+    };
+
+    carousel.addEventListener("pointerdown", onPointerDown, { passive: false, capture: true });
+    carousel.addEventListener("pointermove", onPointerMove, { passive: false, capture: true });
+    carousel.addEventListener("pointerup", onPointerUp, { passive: true, capture: true });
+    carousel.addEventListener("pointercancel", onPointerUp, { passive: true, capture: true });
+    carousel.addEventListener("click", (event) => {
+      if (!window.matchMedia("(max-width: 900px)").matches) return;
+      if (collapsed) {
+        event.preventDefault();
+        setCollapsed(false);
+      }
+    }, { capture: true });
+    if (window.matchMedia("(max-width: 900px)").matches) {
+      setCollapsed(true);
+    }
+    window.visualViewport?.addEventListener("resize", syncCarouselHeight);
+    window.addEventListener("resize", syncCarouselHeight);
+    window.addEventListener("orientationchange", () => syncCarouselHeight());
+
+    if (window.matchMedia("(max-width: 900px)").matches) {
+      document.addEventListener("touchmove", (event) => {
+        if (event.target.closest(".panel-carousel")) {
+          return;
+        }
+        event.preventDefault();
+      }, { passive: false });
+    }
+
+  };
+  initMobileCarousel();
 
 }
 
