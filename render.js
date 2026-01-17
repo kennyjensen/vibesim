@@ -1782,6 +1782,16 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     });
 
     block.group.addEventListener("pointermove", (event) => {
+      if (state.isPinching) {
+        if (dragging || startClient) {
+          dragging = false;
+          startClient = null;
+          startedFromPort = false;
+          didDrag = false;
+          state.fastRouting = false;
+        }
+        return;
+      }
       if (!startClient) return;
       if (!dragging) {
         const dx = event.clientX - startClient.x;
@@ -2100,7 +2110,7 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     state.connections.forEach((conn) => {
       let points = conn.points || [];
       if (!points || points.length < 2) {
-        points = buildFallbackPathFromPorts(conn);
+        points = buildFastDragPathFromPorts(conn);
       }
       const renderPoints = applyWireOffsets(conn, points);
       for (let i = 0; i < renderPoints.length - 1; i += 1) {
@@ -2158,6 +2168,26 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
       state.routingScheduled = false;
       if (state.isPanning || state.isPinching) return;
       if (!runForced && !state.routingDirty) return;
+      if (state.fastRouting) {
+        const dirtySet = new Set(state.dirtyConnections || []);
+        if (state.dirtyBlocks && state.dirtyBlocks.size > 0) {
+          state.connections.forEach((conn) => {
+            if (dirtySet.has(conn)) return;
+            if (state.dirtyBlocks.has(conn.from) || state.dirtyBlocks.has(conn.to)) {
+              dirtySet.add(conn);
+            }
+          });
+        }
+        dirtySet.forEach((conn) => {
+          conn.points = buildFastDragPathFromPorts(conn);
+        });
+        applyWirePathsFast(dirtySet);
+        state.routingDirty = false;
+        if (state.dirtyBlocks) state.dirtyBlocks.clear();
+        if (state.dirtyConnections) state.dirtyConnections.clear();
+        updateSelectionBox();
+        return;
+      }
       const timeLimitMs = state.fastRouting ? 80 : 1000;
       const worldW = Number(svg.dataset.worldWidth) || svg.clientWidth || 1;
       const worldH = Number(svg.dataset.worldHeight) || svg.clientHeight || 1;
@@ -2284,6 +2314,30 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
       }
     });
     state.debugOverlapCount = overlapCount;
+  }
+
+  function applyWirePathsFast(connections) {
+    if (!connections || connections.size === 0) return;
+    connections.forEach((conn) => {
+      let points = conn.points || [];
+      if (!points || points.length < 2) {
+        points = buildFallbackPathFromPorts(conn);
+      }
+      const toBlock = state.blocks.get(conn.to);
+      if (toBlock?.type === "labelSink") {
+        conn.path.removeAttribute("marker-end");
+      } else {
+        conn.path.setAttribute("marker-end", "url(#wire-arrow)");
+      }
+      const renderPoints = buildDragRenderPoints(conn, points);
+      const finalPoints = applyWireOffsets(conn, renderPoints);
+      if (!finalPoints.length || hasInvalidPoint(finalPoints)) return;
+      const segments = buildSegments(finalPoints, conn);
+      const d = buildPathWithHops(segments, []);
+      if (!isValidPathString(d)) return;
+      conn.path.setAttribute("d", d);
+      if (conn.hitPath) conn.hitPath.setAttribute("d", d);
+    });
   }
 
   function isValidPathString(d) {
@@ -2441,6 +2495,39 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     const toPos = getPortPosition(conn.to, "in", conn.toIndex ?? 0);
     if (!fromPos || !toPos) return [];
     return buildFallbackPath(fromPos, toPos);
+  }
+
+  function buildFastDragPathFromPorts(conn) {
+    const fromBlock = state.blocks.get(conn.from);
+    const toBlock = state.blocks.get(conn.to);
+    if (!fromBlock || !toBlock) return buildFallbackPathFromPorts(conn);
+    const fromPort = fromBlock.ports.find((p) => p.type === "out" && p.index === (conn.fromIndex ?? 0));
+    const toPort = toBlock.ports.find((p) => p.type === "in" && p.index === (conn.toIndex ?? 0));
+    if (!fromPort || !toPort) return buildFallbackPathFromPorts(conn);
+    const fromPos = rotatePoint({ x: fromBlock.x + fromPort.x, y: fromBlock.y + fromPort.y }, fromBlock);
+    const toPos = rotatePoint({ x: toBlock.x + toPort.x, y: toBlock.y + toPort.y }, toBlock);
+    const start = { x: snap(fromPos.x), y: snap(fromPos.y) };
+    const end = { x: snap(toPos.x), y: snap(toPos.y) };
+    const startSide = getPortSide(fromBlock, fromPos);
+    const endSide = getPortSide(toBlock, toPos);
+    const step = GRID_SIZE;
+    const startStub = { x: start.x, y: start.y };
+    if (startSide === "left") startStub.x -= step;
+    if (startSide === "right") startStub.x += step;
+    if (startSide === "top") startStub.y -= step;
+    if (startSide === "bottom") startStub.y += step;
+    const endStub = { x: end.x, y: end.y };
+    if (endSide === "left") endStub.x -= step;
+    if (endSide === "right") endStub.x += step;
+    if (endSide === "top") endStub.y -= step;
+    if (endSide === "bottom") endStub.y += step;
+    const mid = [];
+    if (startStub.x === endStub.x || startStub.y === endStub.y) {
+      mid.push(startStub, endStub);
+    } else {
+      mid.push(startStub, { x: endStub.x, y: startStub.y }, endStub);
+    }
+    return dedupePoints([start, ...mid, end]);
   }
 
   function buildOrthogonalHead(fromPos, toPos) {

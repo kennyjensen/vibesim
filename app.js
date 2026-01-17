@@ -27,7 +27,7 @@ const rotateSelectionBtn = document.getElementById("rotateSelection");
 const errorBox = document.getElementById("errorBox");
 const debugPanel = document.getElementById("debugPanel");
 
-const DEBUG_UI = true;
+const DEBUG_UI = false;
 
 if (debugPanel) debugPanel.hidden = !DEBUG_UI;
 
@@ -1532,6 +1532,9 @@ function init() {
     pendingPan = null;
     if (panRaf) cancelAnimationFrame(panRaf);
     panRaf = null;
+    if (state.routingDirty) {
+      renderer.updateConnections(true);
+    }
   };
 
   svg.addEventListener("pointerup", endPinch);
