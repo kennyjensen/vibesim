@@ -156,6 +156,12 @@ body::before {
   gap: 8px;
 }
 
+.codegen-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .examples-panel {
   display: flex;
   flex-direction: column;

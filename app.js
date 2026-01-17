@@ -1,6 +1,7 @@
 import { createRenderer } from "./render.js";
 import { simulate, renderScope } from "./sim.js";
 import { getSnapOffset, shouldCollapse, shouldExpand, lockAxis } from "./carousel-utils.js";
+import { generateCode } from "./codegen/index.js";
 
 const svg = document.getElementById("svgCanvas");
 const blockLayer = document.getElementById("blockLayer");
@@ -13,6 +14,10 @@ const clearBtn = document.getElementById("clearBtn");
 const saveBtn = document.getElementById("saveBtn");
 const loadBtn = document.getElementById("loadBtn");
 const loadInput = document.getElementById("loadInput");
+const codegenBtn = document.getElementById("codegenBtn");
+const codegenLang = document.getElementById("codegenLang");
+const codegenDt = document.getElementById("codegenDt");
+const diagramNameInput = document.getElementById("diagramName");
 const statusEl = document.getElementById("status");
 const runtimeInput = document.getElementById("runtimeInput");
 const inspectorBody = document.getElementById("inspectorBody");
@@ -22,7 +27,7 @@ const rotateSelectionBtn = document.getElementById("rotateSelection");
 const errorBox = document.getElementById("errorBox");
 const debugPanel = document.getElementById("debugPanel");
 
-const DEBUG_UI = false;
+const DEBUG_UI = true;
 
 if (debugPanel) debugPanel.hidden = !DEBUG_UI;
 
@@ -60,6 +65,7 @@ const state = {
   variables: {},
   variablesText: "",
   variablesDisplay: [],
+  diagramName: "vibesim",
 };
 
 let fitToDiagram = () => {};
@@ -88,15 +94,27 @@ const renderer = createRenderer({
   },
 });
 
-  if (fullRouteBtn) {
-    fullRouteBtn.addEventListener("click", () => {
-      try {
-        renderer.forceFullRoute(2000);
-      } catch (error) {
-        statusEl.textContent = `Reroute error: ${error?.message || error}`;
-      }
-    });
-  }
+if (fullRouteBtn) {
+  fullRouteBtn.addEventListener("click", () => {
+    try {
+      renderer.forceFullRoute(2000);
+    } catch (error) {
+      statusEl.textContent = `Reroute error: ${error?.message || error}`;
+    }
+  });
+}
+
+const downloadFile = (name, content) => {
+  const blob = new Blob([content], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
 
 let zoomScale = 1;
 let viewBox = { x: 0, y: 0, w: 0, h: 0 };
@@ -777,6 +795,11 @@ function clearWorkspace() {
   inspectorBody.textContent = "Select a block or wire.";
 }
 
+function sanitizeFilename(name) {
+  const base = String(name || "vibesim").trim() || "vibesim";
+  return base.replace(/[^a-zA-Z0-9_-]+/g, "_");
+}
+
 function serializeDiagram(state) {
   const blocks = Array.from(state.blocks.values()).map((block) => ({
     id: block.id,
@@ -792,13 +815,21 @@ function serializeDiagram(state) {
     fromIndex: conn.fromIndex ?? 0,
     toIndex: conn.toIndex ?? 0,
   }));
-  return { version: 1, blocks, connections, variables: state.variablesText || "" };
+  return {
+    version: 1,
+    name: state.diagramName || "vibesim",
+    blocks,
+    connections,
+    variables: state.variablesText || "",
+  };
 }
 
 function loadDiagram(data) {
   if (!data || typeof data !== "object") throw new Error("Invalid diagram file");
   const blocks = Array.isArray(data.blocks) ? data.blocks : [];
   const connections = Array.isArray(data.connections) ? data.connections : [];
+  state.diagramName = typeof data.name === "string" && data.name.trim() ? data.name.trim() : "vibesim";
+  if (diagramNameInput) diagramNameInput.value = state.diagramName;
   state.variablesText = typeof data.variables === "string" ? data.variables : "";
   const variablesInput = document.getElementById("variablesInput");
   const variablesPreview = document.getElementById("variablesPreview");
@@ -1015,6 +1046,12 @@ function parseYAML(text) {
 }
 
 function init() {
+  if (diagramNameInput) {
+    diagramNameInput.value = state.diagramName;
+    diagramNameInput.addEventListener("input", () => {
+      state.diagramName = diagramNameInput.value.trim() || "vibesim";
+    });
+  }
   const exampleFiles = ["examples/inverted_pendulum.yaml", "examples/emf.yaml"];
   if (examplesList) {
     examplesList.innerHTML = "";
@@ -1022,8 +1059,16 @@ function init() {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "secondary";
-      const label = path.split("/").pop()?.replace(/_/g, " ").replace(/\.ya?ml$/i, "") || path;
-      button.textContent = label.replace(/\b\w/g, (char) => char.toUpperCase());
+      const fallback = path.split("/").pop()?.replace(/_/g, " ").replace(/\.ya?ml$/i, "") || path;
+      button.textContent = fallback.replace(/\b\w/g, (char) => char.toUpperCase());
+      fetch(path, { cache: "no-store" })
+        .then((response) => (response.ok ? response.text() : null))
+        .then((text) => {
+          if (!text) return;
+          const data = parseYAML(text);
+          if (data?.name) button.textContent = String(data.name);
+        })
+        .catch(() => {});
       button.addEventListener("click", async () => {
         statusEl.textContent = "Loading example...";
         try {
@@ -1290,6 +1335,24 @@ function init() {
   } else if (runBtn) {
     runBtn.addEventListener("click", handleRun);
   }
+
+  if (codegenBtn) {
+    codegenBtn.addEventListener("click", () => {
+      const lang = codegenLang?.value || "c";
+      const content = generateCode({
+        lang,
+        sampleTime: codegenDt?.value ?? 0.01,
+        diagram: {
+          blocks: Array.from(state.blocks.values()),
+          connections: state.connections.slice(),
+          variables: state.variables || {},
+        },
+      });
+      const baseName = sanitizeFilename(state.diagramName);
+      const ext = lang === "python" ? "py" : lang === "tikz" ? "tex" : "c";
+      downloadFile(`${baseName}.${ext}`, content);
+    });
+  }
   clearBtn.addEventListener("click", clearWorkspace);
 
   if (saveBtn) {
@@ -1299,7 +1362,7 @@ function init() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = "diagram.yaml";
+      link.download = `${sanitizeFilename(state.diagramName)}.yaml`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
