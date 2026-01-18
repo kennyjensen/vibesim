@@ -414,6 +414,7 @@ function serializeDiagram(state) {
     blocks,
     connections,
     variables: state.variablesText || "",
+    runtime: Number(runtimeInput?.value) || 0,
   };
 }
 
@@ -423,6 +424,9 @@ function loadDiagram(data) {
   const connections = Array.isArray(data.connections) ? data.connections : [];
   state.diagramName = typeof data.name === "string" && data.name.trim() ? data.name.trim() : "vibesim";
   if (diagramNameInput) diagramNameInput.value = state.diagramName;
+  if (runtimeInput && Number.isFinite(Number(data.runtime))) {
+    runtimeInput.value = String(Number(data.runtime));
+  }
   state.variablesText = typeof data.variables === "string" ? data.variables : "";
   const variablesInput = document.getElementById("variablesInput");
   const variablesPreview = document.getElementById("variablesPreview");

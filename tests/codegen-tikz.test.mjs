@@ -2,6 +2,7 @@ import assert from "assert/strict";
 import { generateTikz } from "../codegen/tikz.js";
 import { buildBasicDiagram, runJsSim } from "./codegen-helpers.mjs";
 
+
 {
   const diagram = buildBasicDiagram();
   const jsSeries = runJsSim(diagram);
