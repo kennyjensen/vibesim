@@ -65,6 +65,8 @@ const state = {
   routingDirty: false,
   routingScheduled: false,
   fastRouting: false,
+  deferRouting: false,
+  deferRoutingIds: new Set(),
   dirtyBlocks: new Set(),
   dirtyConnections: new Set(),
   variables: {},

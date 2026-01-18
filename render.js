@@ -1861,12 +1861,26 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
       didDrag = false;
       state.fastRouting = false;
       if (moved) {
+        const movedIds = dragGroup
+          ? Array.from(dragGroup.startPositions.keys())
+          : [block.id];
+        const hasCollision = detectBlockOverlap(movedIds);
+        state.deferRouting = hasCollision;
+        state.deferRoutingIds = hasCollision ? new Set(movedIds) : new Set();
         if (state.dirtyBlocks) {
           if (dragGroup) {
             dragGroup.startPositions.forEach((_pos, id) => state.dirtyBlocks.add(id));
           } else {
             state.dirtyBlocks.add(block.id);
           }
+        }
+        if (hasCollision) {
+          state.routingDirty = false;
+          if (state.dirtyBlocks) state.dirtyBlocks.clear();
+          if (state.dirtyConnections) state.dirtyConnections.clear();
+          updateSelectionBox();
+          dragGroup = null;
+          return;
         }
         state.routingDirty = true;
         updateConnections(true);
@@ -2171,6 +2185,18 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
       state.routingScheduled = false;
       if (state.isPanning || state.isPinching) return;
       if (!runForced && !state.routingDirty) return;
+      if (!state.fastRouting && state.deferRouting && state.deferRoutingIds && state.deferRoutingIds.size > 0) {
+        const ids = Array.from(state.deferRoutingIds);
+        if (detectBlockOverlap(ids)) {
+          state.routingDirty = false;
+          if (state.dirtyBlocks) state.dirtyBlocks.clear();
+          if (state.dirtyConnections) state.dirtyConnections.clear();
+          updateSelectionBox();
+          return;
+        }
+        state.deferRouting = false;
+        state.deferRoutingIds.clear();
+      }
       if (state.fastRouting) {
         const dirtySet = new Set(state.dirtyConnections || []);
         if (state.dirtyBlocks && state.dirtyBlocks.size > 0) {
@@ -2513,6 +2539,41 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     const end = { x: snap(toPos.x), y: snap(toPos.y) };
     const startSide = getPortSide(fromBlock, fromPos);
     const endSide = getPortSide(toBlock, toPos);
+    const prevPoints = (conn.points || []).filter((pt) => Number.isFinite(pt.x) && Number.isFinite(pt.y));
+    const movingFrom = state.dirtyBlocks?.has(conn.from) && !state.dirtyBlocks?.has(conn.to);
+    const movingTo = state.dirtyBlocks?.has(conn.to) && !state.dirtyBlocks?.has(conn.from);
+    if ((movingFrom || movingTo) && prevPoints.length >= 4) {
+      const turnIndices = getTurnIndices(prevPoints);
+      if (turnIndices.length >= 2) {
+        const anchorIdx = movingFrom
+          ? turnIndices[1]
+          : turnIndices[turnIndices.length - 2];
+        const anchor = prevPoints[anchorIdx];
+        if (anchor) {
+          if (movingFrom && anchorIdx > 0) {
+            const approach = segmentOrientation(prevPoints[anchorIdx - 1], anchor);
+            if (approach) {
+              const head = buildDragPathToAnchor(start, startSide, anchor, approach);
+              const tail = prevPoints.slice(anchorIdx + 1);
+              return dedupePoints([...head, ...tail]);
+            }
+          }
+          if (movingTo && anchorIdx < prevPoints.length - 1) {
+            const approach = segmentOrientation(anchor, prevPoints[anchorIdx + 1]);
+            if (approach) {
+              const tailFromEnd = buildDragPathToAnchor(end, endSide, anchor, approach);
+              const tail = dedupePoints(tailFromEnd.slice().reverse());
+              const head = prevPoints.slice(0, anchorIdx + 1);
+              return dedupePoints([...head, ...tail.slice(1)]);
+            }
+          }
+        }
+      }
+    }
+    return buildQuickPathBetweenPorts(start, startSide, end, endSide);
+  }
+
+  function buildQuickPathBetweenPorts(start, startSide, end, endSide) {
     const step = GRID_SIZE;
     const startStub = { x: start.x, y: start.y };
     if (startSide === "left") startStub.x -= step;
@@ -2531,6 +2592,43 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
       mid.push(startStub, { x: endStub.x, y: startStub.y }, endStub);
     }
     return dedupePoints([start, ...mid, end]);
+  }
+
+  function getTurnIndices(points) {
+    const turns = [];
+    for (let i = 1; i < points.length - 1; i += 1) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      const next = points[i + 1];
+      const dir1 = segmentOrientation(prev, curr);
+      const dir2 = segmentOrientation(curr, next);
+      if (dir1 && dir2 && dir1 !== dir2) {
+        turns.push(i);
+      }
+    }
+    return turns;
+  }
+
+  function segmentOrientation(a, b) {
+    if (!a || !b) return null;
+    if (a.x === b.x && a.y !== b.y) return "V";
+    if (a.y === b.y && a.x !== b.x) return "H";
+    return null;
+  }
+
+  function buildDragPathToAnchor(start, startSide, anchor, approach) {
+    const step = GRID_SIZE;
+    const startStub = { x: start.x, y: start.y };
+    if (startSide === "left") startStub.x -= step;
+    if (startSide === "right") startStub.x += step;
+    if (startSide === "top") startStub.y -= step;
+    if (startSide === "bottom") startStub.y += step;
+    if (approach === "H") {
+      if (startStub.y === anchor.y) return dedupePoints([start, startStub, anchor]);
+      return dedupePoints([start, startStub, { x: startStub.x, y: anchor.y }, anchor]);
+    }
+    if (startStub.x === anchor.x) return dedupePoints([start, startStub, anchor]);
+    return dedupePoints([start, startStub, { x: anchor.x, y: startStub.y }, anchor]);
   }
 
   function buildOrthogonalHead(fromPos, toPos) {
@@ -2802,6 +2900,31 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
       top: top - padding,
       bottom: bottom + padding,
     };
+  }
+
+  function rectsOverlap(a, b) {
+    return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+  }
+
+  function detectBlockOverlap(ids) {
+    if (!ids || ids.length === 0) return false;
+    const movedIds = new Set(ids);
+    const movedBlocks = ids.map((id) => state.blocks.get(id)).filter(Boolean);
+    if (movedBlocks.length === 0) return false;
+    const movedRects = movedBlocks.map((block) => ({ id: block.id, rect: blockBounds(block) }));
+    const otherRects = [];
+    state.blocks.forEach((block) => {
+      if (movedIds.has(block.id)) return;
+      otherRects.push({ id: block.id, rect: blockBounds(block) });
+    });
+    for (let i = 0; i < movedRects.length; i += 1) {
+      const a = movedRects[i].rect;
+      for (let j = 0; j < otherRects.length; j += 1) {
+        const b = otherRects[j].rect;
+        if (rectsOverlap(a, b)) return true;
+      }
+    }
+    return false;
   }
 
   function segmentHitsRect(a, b, rect) {
