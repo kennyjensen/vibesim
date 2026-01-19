@@ -1,0 +1,211 @@
+version: 1
+name: Anti-windup
+blocks:
+  -
+    id: b3
+    type: gain
+    x: 1970
+    y: 1570
+    rotation: 0
+    params:
+      gain: 1
+  -
+    id: b5
+    type: gain
+    x: 2050
+    y: 1700
+    rotation: 0
+    params:
+      gain: 2
+  -
+    id: b6
+    type: sum
+    x: 2180
+    y: 1600
+    rotation: 0
+    params:
+      signs:
+        - 1
+        - 1
+        - 1
+  -
+    id: b8
+    type: tf
+    x: 2450
+    y: 1570
+    rotation: 0
+    params:
+      num:
+        - 1
+      den:
+        - 1
+        - 3
+        - 1
+  -
+    id: b9
+    type: saturation
+    x: 2290
+    y: 1570
+    rotation: 0
+    params:
+      min: -1
+      max: 1
+  -
+    id: b10
+    type: sum
+    x: 2320
+    y: 1730
+    rotation: 90
+    params:
+      signs:
+        - 1
+        - 1
+        - -1
+  -
+    id: b11
+    type: scope
+    x: 2730
+    y: 1530
+    rotation: 0
+    params:
+      tMin: ""
+      tMax: ""
+      yMin: ""
+      yMax: ""
+      width: 220
+      height: 160
+  -
+    id: b12
+    type: step
+    x: 1600
+    y: 1570
+    rotation: 0
+    params:
+      stepTime: 2
+  -
+    id: b14
+    type: sum
+    x: 1760
+    y: 1600
+    rotation: 0
+    params:
+      signs:
+        - 1
+        - 1
+        - -1
+  -
+    id: b15
+    type: sum
+    x: 1850
+    y: 1730
+    rotation: 0
+    params:
+      signs:
+        - 1
+        - 1
+        - 1
+  -
+    id: b16
+    type: integrator
+    x: 1920
+    y: 1700
+    rotation: 0
+    params:
+      {}
+  -
+    id: b18
+    type: gain
+    x: 1970
+    y: 1820
+    rotation: 180
+    params:
+      gain: 1
+connections:
+  -
+    from: b5
+    to: b6
+    fromIndex: 0
+    toIndex: 2
+  -
+    from: b6
+    to: b9
+    fromIndex: 0
+    toIndex: 0
+  -
+    from: b9
+    to: b8
+    fromIndex: 0
+    toIndex: 0
+  -
+    from: b6
+    to: b10
+    fromIndex: 0
+    toIndex: 2
+  -
+    from: b9
+    to: b10
+    fromIndex: 0
+    toIndex: 1
+  -
+    from: b14
+    to: b3
+    fromIndex: 0
+    toIndex: 0
+  -
+    from: b12
+    to: b14
+    fromIndex: 0
+    toIndex: 0
+  -
+    from: b8
+    to: b14
+    fromIndex: 0
+    toIndex: 2
+  -
+    from: b14
+    to: b15
+    fromIndex: 0
+    toIndex: 1
+  -
+    from: b12
+    to: b11
+    fromIndex: 0
+    toIndex: 0
+  -
+    from: b8
+    to: b11
+    fromIndex: 0
+    toIndex: 1
+  -
+    from: b15
+    to: b16
+    fromIndex: 0
+    toIndex: 0
+  -
+    from: b16
+    to: b5
+    fromIndex: 0
+    toIndex: 0
+  -
+    from: b10
+    to: b18
+    fromIndex: 0
+    toIndex: 0
+  -
+    from: b6
+    to: b11
+    fromIndex: 0
+    toIndex: 2
+  -
+    from: b3
+    to: b6
+    fromIndex: 0
+    toIndex: 0
+  -
+    from: b18
+    to: b15
+    fromIndex: 0
+    toIndex: 2
+variables: ""
+runtime: 10
+

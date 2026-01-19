@@ -793,7 +793,7 @@ function init() {
     }
   };
 
-  const exampleFiles = ["examples/inverted_pendulum.yaml", "examples/emf.yaml"];
+  const exampleFiles = ["examples/inverted_pendulum.yaml", "examples/emf.yaml", "examples/antiwindup.yaml"];
   if (examplesList) {
     examplesList.innerHTML = "";
     exampleFiles.forEach((path) => {

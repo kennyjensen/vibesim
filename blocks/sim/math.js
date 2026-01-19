@@ -6,8 +6,9 @@ export const mathSimHandlers = {
       const params = ctx.resolvedParams.get(block.id) || {};
       const values = getInputValues(ctx, block);
       if (values[0] === undefined) return null;
-      const gainValue = Number(params.gain) || 1;
-      const out = (values[0] || 0) * gainValue;
+      const rawGain = Number(params.gain);
+      const gainValue = Number.isFinite(rawGain) ? rawGain : 1;
+      const out = (values[0] ?? 0) * gainValue;
       const prev = ctx.outputs.get(block.id);
       ctx.outputs.set(block.id, out);
       return { updated: prev !== out && !(Number.isNaN(prev) && Number.isNaN(out)) };
