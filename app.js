@@ -767,6 +767,32 @@ function init() {
   };
   window.addEventListener("diagramChanged", updateStabilityPanel);
   updateStabilityPanel();
+  const normalizeExamplePath = (path) => {
+    if (!path) return "";
+    const trimmed = path.trim();
+    if (!trimmed) return "";
+    const withExt = /\.ya?ml$/i.test(trimmed) ? trimmed : `${trimmed}.yaml`;
+    if (withExt.includes("/")) return withExt;
+    return `examples/${withExt}`;
+  };
+
+  const loadExample = async (path) => {
+    const normalizedPath = normalizeExamplePath(path);
+    if (!normalizedPath) return;
+    const resolvedPath = new URL(normalizedPath, window.location.href).toString();
+    if (statusEl) statusEl.textContent = `Loading example: ${path}`;
+    try {
+      const response = await fetch(resolvedPath, { cache: "no-store" });
+      if (!response.ok) throw new Error(`Failed to load ${normalizedPath}`);
+      const text = await response.text();
+      const data = parseYAML(text);
+      loadDiagram(data);
+      if (statusEl) statusEl.textContent = "Loaded example";
+    } catch (error) {
+      if (statusEl) statusEl.textContent = `Example load error: ${error?.message || error}`;
+    }
+  };
+
   const exampleFiles = ["examples/inverted_pendulum.yaml", "examples/emf.yaml"];
   if (examplesList) {
     examplesList.innerHTML = "";
@@ -784,21 +810,23 @@ function init() {
           if (data?.name) button.textContent = String(data.name);
         })
         .catch(() => {});
-      button.addEventListener("click", async () => {
-        statusEl.textContent = "Loading example...";
-        try {
-          const response = await fetch(path, { cache: "no-store" });
-          if (!response.ok) throw new Error(`Failed to load ${path}`);
-          const text = await response.text();
-          const data = parseYAML(text);
-          loadDiagram(data);
-          statusEl.textContent = "Loaded example";
-        } catch (error) {
-          statusEl.textContent = `Example load error: ${error?.message || error}`;
-        }
-      });
+      button.addEventListener("click", () => loadExample(path));
       examplesList.appendChild(button);
     });
+  }
+  const url = new URL(window.location.href);
+  const exampleParam = url.searchParams.get("example");
+  const hashExample = window.location.hash.match(/example=([^&]+)/);
+  if (exampleParam) {
+    loadExample(decodeURIComponent(exampleParam));
+  } else if (hashExample) {
+    loadExample(decodeURIComponent(hashExample[1]));
+  } else {
+    const urlPath = decodeURIComponent(window.location.pathname || "");
+    if (/\.ya?ml$/i.test(urlPath)) {
+      const cleanedPath = urlPath.replace(/^\/+/, "");
+      loadExample(cleanedPath);
+    }
   }
   const initViewBox = () => {
     const { w, h } = getViewportSize();
