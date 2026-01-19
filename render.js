@@ -12,7 +12,6 @@ import {
   segmentsOverlap,
 } from "./render/geometry.js";
 
-const DEBUG_SELECTION = true;
 const DEBUG_WIRE_CHECKS = true;
 const SELECTION_PAD = 10;
 const HOP_RADIUS = 4;
@@ -776,28 +775,6 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     display: "none",
   });
   overlayLayer.appendChild(marqueeRect);
-  const debugBaseRect = createSvgElement("rect", {
-    class: "selection-debug-base",
-    x: 0,
-    y: 0,
-    width: 0,
-    height: 0,
-    display: DEBUG_SELECTION ? "block" : "none",
-  });
-  const debugKeepoutRect = createSvgElement("rect", {
-    class: "selection-debug-keepout",
-    x: 0,
-    y: 0,
-    width: 0,
-    height: 0,
-    display: DEBUG_SELECTION ? "block" : "none",
-  });
-  const debugText = createSvgElement("text", { class: "selection-debug-text", x: 8, y: 16 });
-  if (DEBUG_SELECTION) {
-    overlayLayer.appendChild(debugBaseRect);
-    overlayLayer.appendChild(debugKeepoutRect);
-    overlayLayer.appendChild(debugText);
-  }
 
 
   function createBlock(type, x = 60, y = 60, options = {}) {
@@ -2424,11 +2401,6 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     const selected = state.selectedId ? state.blocks.get(state.selectedId) : null;
     if (!selected) {
       selectionRect.setAttribute("display", "none");
-      if (DEBUG_SELECTION) {
-        debugBaseRect.setAttribute("display", "none");
-        debugKeepoutRect.setAttribute("display", "none");
-        debugText.textContent = "";
-      }
       return;
     }
     const bounds = getRotatedBounds(selected);
@@ -2443,19 +2415,6 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     selectionRect.setAttribute("y", rect.top);
     selectionRect.setAttribute("width", rect.right - rect.left);
     selectionRect.setAttribute("height", rect.bottom - rect.top);
-    if (DEBUG_SELECTION) {
-      debugBaseRect.setAttribute("display", "block");
-      debugBaseRect.setAttribute("x", bounds.left);
-      debugBaseRect.setAttribute("y", bounds.top);
-      debugBaseRect.setAttribute("width", bounds.right - bounds.left);
-      debugBaseRect.setAttribute("height", bounds.bottom - bounds.top);
-      debugKeepoutRect.setAttribute("display", "block");
-      debugKeepoutRect.setAttribute("x", rect.left);
-      debugKeepoutRect.setAttribute("y", rect.top);
-      debugKeepoutRect.setAttribute("width", rect.right - rect.left);
-      debugKeepoutRect.setAttribute("height", rect.bottom - rect.top);
-      debugText.textContent = `pad=${SELECTION_PAD}`;
-    }
   }
 
   function clearWorkspace() {

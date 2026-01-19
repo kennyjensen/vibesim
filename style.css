@@ -699,27 +699,6 @@ body::before {
   pointer-events: none;
 }
 
-.selection-debug-base {
-  fill: none;
-  stroke: #1e4ed8;
-  stroke-width: 1;
-  stroke-dasharray: 4 4;
-  pointer-events: none;
-}
-
-.selection-debug-keepout {
-  fill: none;
-  stroke: #dc2626;
-  stroke-width: 1;
-  stroke-dasharray: 3 3;
-  pointer-events: none;
-}
-
-.selection-debug-text {
-  fill: #111827;
-  font-size: 12px;
-}
-
 .sum-circle {
   fill: #f7eddf;
   stroke: #3c3c3c;
