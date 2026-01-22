@@ -738,6 +738,24 @@ body::before {
   dominant-baseline: middle;
 }
 
+.svg-block[data-rotation="90"] .sum-sign {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: rotate(-90deg);
+}
+
+.svg-block[data-rotation="180"] .sum-sign {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: rotate(180deg);
+}
+
+.svg-block[data-rotation="270"] .sum-sign {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: rotate(90deg);
+}
+
 .gain-triangle {
   fill: #f7eddf;
   stroke: #3c3c3c;
@@ -806,6 +824,12 @@ body::before {
 
 .inspector {
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  max-height: 100%;
+  overflow: auto;
 }
 
 .variables-panel {
@@ -848,6 +872,7 @@ body::before {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
 }
 
 .inspector .button-row {
@@ -1003,6 +1028,16 @@ body::before {
   }
 
   .panel-carousel .variables-panel {
+    overflow: auto;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .panel-carousel .inspector {
+    overflow: hidden;
+  }
+
+  .panel-carousel .inspector-body {
     overflow: auto;
     touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
