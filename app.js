@@ -41,27 +41,6 @@ if (debugPanel) debugPanel.hidden = !DEBUG_UI;
 
 if (rotateSelectionBtn) rotateSelectionBtn.disabled = true;
 
-const scheduleMathJaxLoad = () => {
-  if (window.MathJax || window.__mathJaxLoading) return;
-  window.__mathJaxLoading = true;
-  window.MathJax = {
-    tex: { inlineMath: [["$", "$"], ["\\(", "\\)"]] },
-    svg: { fontCache: "global" },
-  };
-  const script = document.createElement("script");
-  script.src = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js";
-  script.async = true;
-  script.onload = () => {
-    window.__mathJaxLoading = false;
-    if (window.MathJax?.typesetPromise) {
-      window.MathJax.typesetPromise();
-    }
-  };
-  script.onerror = () => {
-    window.__mathJaxLoading = false;
-  };
-  document.head.appendChild(script);
-};
 
 const renderBlockLibrary = () => {
   if (!blockLibraryGroups) return;
@@ -1528,6 +1507,3 @@ function init() {
 }
 
 init();
-
-const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 800));
-idle(() => scheduleMathJaxLoad());

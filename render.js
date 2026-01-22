@@ -43,34 +43,37 @@ function renderSvgMath(group, mathMl, width, height) {
   group.appendChild(foreign);
 }
 
-let mathJaxQueued = false;
-let mathJaxRetryScheduled = false;
-let mathJaxFlushScheduled = false;
-const mathJaxQueue = new Set();
-function queueMathJaxTypeset() {
-  if (mathJaxFlushScheduled) return;
-  mathJaxFlushScheduled = true;
-  requestAnimationFrame(() => {
-    mathJaxFlushScheduled = false;
-    if (window.MathJax && typeof window.MathJax.typesetPromise === "function") {
-      const targets = Array.from(mathJaxQueue);
-      mathJaxQueue.clear();
-      window.MathJax.typesetPromise(targets);
-      mathJaxRetryScheduled = false;
-    } else if (!mathJaxRetryScheduled) {
-      mathJaxRetryScheduled = true;
-      setTimeout(() => {
-        mathJaxRetryScheduled = false;
-        queueMathJaxTypeset();
-      }, 200);
+let katexRetryScheduled = false;
+const katexQueue = new Set();
+function queueKatexRender() {
+  if (katexRetryScheduled) return;
+  katexRetryScheduled = true;
+  setTimeout(() => {
+    katexRetryScheduled = false;
+    if (window.katex && typeof window.katex.render === "function") {
+      const targets = Array.from(katexQueue);
+      katexQueue.clear();
+      targets.forEach((group) => {
+        const spans = group.querySelectorAll(".katex-target[data-tex]");
+        spans.forEach((span) => {
+          const tex = span.dataset.tex || "";
+          try {
+            window.katex.render(tex, span, { throwOnError: false });
+          } catch {
+            span.textContent = tex;
+          }
+          span.classList.remove("katex-target");
+        });
+      });
+    } else if (katexQueue.size) {
+      queueKatexRender();
     }
-  });
+  }, 100);
 }
 
 function renderTeXMath(group, tex, width, height) {
   if (!group) return;
   group.innerHTML = "";
-  mathJaxQueue.add(group);
   const foreign = createSvgElement("foreignObject", {
     x: 0,
     y: 0,
@@ -82,12 +85,22 @@ function renderTeXMath(group, tex, width, height) {
   div.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
   div.className = "math-foreign";
   const span = document.createElement("span");
-  span.className = "mathjax-tex";
-  span.textContent = `\\(${tex}\\)`;
+  span.className = "katex-target";
+  span.dataset.tex = tex;
+  if (window.katex && typeof window.katex.render === "function") {
+    try {
+      window.katex.render(tex, span, { throwOnError: false });
+      span.classList.remove("katex-target");
+    } catch {
+      span.textContent = tex;
+    }
+  } else {
+    katexQueue.add(group);
+    queueKatexRender();
+  }
   div.appendChild(span);
   foreign.appendChild(div);
   group.appendChild(foreign);
-  queueMathJaxTypeset();
 }
 
 function svgRect(x, y, w, h, cls) {
