@@ -41,6 +41,27 @@ if (debugPanel) debugPanel.hidden = !DEBUG_UI;
 
 if (rotateSelectionBtn) rotateSelectionBtn.disabled = true;
 
+const themes = [
+  { id: "signal-slate", name: "Signal Slate" },
+  { id: "analog-sand", name: "Analog Sand" },
+  { id: "control-grid", name: "Control Grid" },
+  { id: "orbit-ice", name: "Orbit Ice" },
+  { id: "lab-white", name: "Lab White" },
+  { id: "circuit-mint", name: "Circuit Mint" },
+  { id: "radar-tan", name: "Radar Tan" },
+  { id: "blueprint-lite", name: "Blueprint Lite" },
+  { id: "quartz-steel", name: "Quartz Steel" },
+  { id: "night-shift", name: "Night Shift" },
+  { id: "terminal-ink", name: "Terminal Ink" },
+  { id: "violet-burn", name: "Violet Burn" },
+  { id: "noir-cyan", name: "Noir Cyan" },
+];
+
+const applyTheme = (themeId) => {
+  const chosen = themes.find((theme) => theme.id === themeId) || themes[0];
+  document.body.dataset.theme = chosen.id;
+};
+
 
 const renderBlockLibrary = () => {
   if (!blockLibraryGroups) return;
@@ -766,6 +787,7 @@ function init() {
       marginOutputText.textContent = `Error: ${err?.message || err}`;
     }
   };
+  applyTheme(themes[0].id);
   window.addEventListener("diagramChanged", updateStabilityPanel);
   updateStabilityPanel();
   const normalizeExamplePath = (path) => {
