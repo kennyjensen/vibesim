@@ -14,8 +14,10 @@ Deployed site: https://sim.vibefoil.com
 
 ## Examples
 
-- [Inverted pendulum](https://sim.vibefoil.com/?example=inverted_pendulum)
+- [Anti-windup](https://sim.vibefoil.com/?example=antiwindup)
+- [Complementary filter](https://sim.vibefoil.com/?example=complementary)
 - [EMF model](https://sim.vibefoil.com/?example=emf)
+- [Inverted pendulum](https://sim.vibefoil.com/?example=inverted_pendulum)
 
 ## Run locally
 

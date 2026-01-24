@@ -616,10 +616,7 @@ export const generateC = (diagram, { sampleTime = 0.01, includeMain = true } = {
     } else if (type === "saturation") {
       const maxVal = resolveNumeric(params.max, variables);
       const minVal = resolveNumeric(params.min, variables);
-      lines.push(`  { double v = ${in0Expr};`);
-      lines.push(`    if (v > ${maxVal}) v = ${maxVal};`);
-      lines.push(`    if (v < ${minVal}) v = ${minVal};`);
-      lines.push(`    out_${bid} = v; }`);
+      lines.push(`  out_${bid} = fmin(fmax(${in0Expr}, ${minVal}), ${maxVal});`);
     } else if (type === "integrator") {
       lines.push(`  s->int_${bid} += ${in0Expr} * dt;`);
       lines.push(`  out_${bid} = s->int_${bid};`);
