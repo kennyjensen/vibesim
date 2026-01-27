@@ -261,6 +261,15 @@ body[data-theme="noir-cyan"] {
   border-bottom: 2px solid var(--border);
 }
 
+.github-star {
+  display: flex;
+  align-items: center;
+}
+
+.github-star--about {
+  display: none;
+}
+
 .brand {
   display: flex;
   flex-direction: column;
@@ -1175,6 +1184,19 @@ body[data-theme="noir-cyan"] {
 
   .topbar {
     display: none;
+  }
+
+  .github-star--topbar {
+    display: none;
+  }
+
+  .github-star--about {
+    display: flex;
+  }
+
+  .about-logo {
+    justify-content: space-between;
+    gap: 8px;
   }
 
   .layout {

@@ -12,6 +12,8 @@ import {
   segmentsOverlap,
 } from "./render/geometry.js";
 
+export const FORCE_FULL_ROUTE_TIME_LIMIT_MS = 4000;
+
 const DEBUG_WIRE_CHECKS = true;
 const SELECTION_PAD = 10;
 const HOP_RADIUS = 4;
@@ -1586,7 +1588,7 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     });
   }
 
-  function forceFullRoute(timeLimitMs = 2000) {
+  function forceFullRoute(timeLimitMs = FORCE_FULL_ROUTE_TIME_LIMIT_MS) {
     const worldW = Number(svg.dataset.worldWidth) || svg.clientWidth || 1;
     const worldH = Number(svg.dataset.worldHeight) || svg.clientHeight || 1;
     const paths = routeAllConnections(state, worldW, worldH, { x: 0, y: 0 }, timeLimitMs, false);

@@ -1,4 +1,4 @@
-import { createRenderer } from "./render.js";
+import { createRenderer, FORCE_FULL_ROUTE_TIME_LIMIT_MS } from "./render.js";
 import { simulate, renderScope } from "./sim.js";
 import { getSnapOffset, shouldCollapse, shouldExpand, lockAxis } from "./carousel-utils.js";
 import { generateCode } from "./codegen/index.js";
@@ -490,9 +490,19 @@ function loadDiagram(data) {
     renderer.createConnection(conn.from, conn.to, conn.toIndex ?? 0, conn.fromIndex ?? 0);
   });
 
-  renderer.forceFullRoute(3000);
   fitToDiagram();
-  if (typeof updateStabilityPanel === "function") updateStabilityPanel();
+  // Show blocks and simple wires immediately, then do the expensive route.
+  state.fastRouting = true;
+  state.routingDirty = true;
+  state.dirtyConnections = new Set(state.connections);
+  renderer.updateConnections(true);
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      state.fastRouting = false;
+      renderer.forceFullRoute(FORCE_FULL_ROUTE_TIME_LIMIT_MS);
+      if (typeof updateStabilityPanel === "function") updateStabilityPanel();
+    }, 0);
+  });
 }
 
 function toYAML(data) {
