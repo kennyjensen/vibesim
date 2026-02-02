@@ -211,6 +211,16 @@ export const createInspector = ({
         block.params.amp = ampInput.value;
         renderer.updateBlockLabel(block);
       });
+    } else if (block.type === "integrator") {
+      inspectorBody.innerHTML = `
+        <label class="param">Initial state
+          <input type="text" data-edit="initial" value="${block.params.initial ?? 0}" step="0.1">
+        </label>
+      `;
+      const initialInput = inspectorBody.querySelector("input[data-edit='initial']");
+      initialInput.addEventListener("input", () => {
+        block.params.initial = initialInput.value;
+      });
     } else if (block.type === "labelSource" || block.type === "labelSink") {
       inspectorBody.innerHTML = `
         <label class="param">Label name

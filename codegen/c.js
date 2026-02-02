@@ -279,7 +279,10 @@ export const generateC = (diagram, { sampleTime = 0.01, includeMain = true } = {
   blocks.forEach((block) => {
     const id = sanitizeId(block.id);
     const params = block.params || {};
-    if (block.type === "integrator") addState(`int_${id}`);
+    if (block.type === "integrator") {
+      const initVal = resolveNumeric(params.initial, variables);
+      addState(`int_${id}`, `${initVal}`);
+    }
     if (block.type === "derivative") addState(`der_prev_${id}`);
     if (block.type === "rate") addState(`rate_${id}`);
     if (block.type === "backlash") addState(`backlash_${id}`);

@@ -212,7 +212,9 @@ export const generatePython = (diagram, { sampleTime = 0.01, includeMain = true 
   blocks.forEach((block) => {
     const id = sanitizeId(block.id);
     const params = block.params || {};
-    if (block.type === "integrator") stateInit.push(`state["int_${id}"] = 0.0`);
+    if (block.type === "integrator") {
+      stateInit.push(`state["int_${id}"] = ${resolveNumeric(params.initial, variables)}`);
+    }
     if (block.type === "derivative") {
       stateInit.push(`state["der_prev_${id}"] = 0.0`);
     }

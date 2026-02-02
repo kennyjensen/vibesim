@@ -27,7 +27,7 @@ export const createContinuousTemplates = (helpers) => {
       height: 80,
       inputs: [{ x: 0, y: 40, side: "left" }],
       outputs: [{ x: 80, y: 40, side: "right" }],
-      defaultParams: {},
+      defaultParams: { initial: 0 },
       render: (block) => {
         const group = block.group;
         group.appendChild(

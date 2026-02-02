@@ -10,8 +10,9 @@ import {
 export const continuousSimHandlers = {
   integrator: {
     init: (ctx, block) => {
+      const params = ctx.resolvedParams.get(block.id) || {};
       const state = getBlockState(ctx, block);
-      state.integrator = 0;
+      state.integrator = Number(params.initial) || 0;
     },
     output: (ctx, block) => {
       const state = getBlockState(ctx, block);
