@@ -49,35 +49,35 @@ export const createMathTemplates = (helpers) => {
       },
     },
     mult: {
-      width: 40,
-      height: 40,
+      width: 20,
+      height: 20,
       inputs: [
-        { x: 20 - GRID_SIZE * 2, y: 20, side: "left", wireX: 20 - GRID_SIZE, wireY: 20 },
-        { x: 20, y: 20 - GRID_SIZE * 2, side: "top", wireX: 20, wireY: 20 - GRID_SIZE },
-        { x: 20, y: 20 + GRID_SIZE * 2, side: "bottom", wireX: 20, wireY: 20 + GRID_SIZE },
+        { x: 10 - GRID_SIZE * 2, y: 10, side: "left", wireX: 10 - GRID_SIZE, wireY: 10 },
+        { x: 10, y: 10 - GRID_SIZE * 2, side: "top", wireX: 10, wireY: 10 - GRID_SIZE },
+        { x: 10, y: 10 + GRID_SIZE * 2, side: "bottom", wireX: 10, wireY: 10 + GRID_SIZE },
       ],
-      outputs: [{ x: 20 + GRID_SIZE * 2, y: 20, side: "right", wireX: 20 + GRID_SIZE, wireY: 20 }],
+      outputs: [{ x: 10 + GRID_SIZE * 2, y: 10, side: "right", wireX: 10 + GRID_SIZE, wireY: 10 }],
       defaultParams: {},
       render: (block) => {
         const group = block.group;
-        const r = 20;
+        const r = 10;
         const offset = r / Math.SQRT2;
-        group.appendChild(createSvgElement("circle", { cx: 20, cy: 20, r: 20, class: "sum-circle" }));
+        group.appendChild(createSvgElement("circle", { cx: 10, cy: 10, r: 10, class: "sum-circle" }));
         group.appendChild(
           createSvgElement("line", {
-            x1: 20 - offset,
-            y1: 20 - offset,
-            x2: 20 + offset,
-            y2: 20 + offset,
+            x1: 10 - offset,
+            y1: 10 - offset,
+            x2: 10 + offset,
+            y2: 10 + offset,
             class: "sum-line",
           })
         );
         group.appendChild(
           createSvgElement("line", {
-            x1: 20 + offset,
-            y1: 20 - offset,
-            x2: 20 - offset,
-            y2: 20 + offset,
+            x1: 10 + offset,
+            y1: 10 - offset,
+            x2: 10 - offset,
+            y2: 10 + offset,
             class: "sum-line",
           })
         );

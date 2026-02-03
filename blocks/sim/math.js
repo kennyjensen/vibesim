@@ -38,11 +38,18 @@ export const mathSimHandlers = {
   mult: {
     algebraic: (ctx, block) => {
       const values = getInputValues(ctx, block);
-      if (values.some((v) => v === undefined)) return null;
-      const v0 = values[0] ?? 1;
-      const v1 = values[1] ?? 1;
-      const v2 = values[2] ?? 1;
-      const out = v0 * v1 * v2;
+      const inputs = ctx.inputMap.get(block.id) || [];
+      let missing = false;
+      const resolved = inputs.map((fromId, idx) => {
+        if (!fromId) return 1;
+        if (!ctx.outputs.has(fromId)) {
+          missing = true;
+          return 1;
+        }
+        return values[idx] ?? 1;
+      });
+      if (missing) return null;
+      const out = resolved.reduce((acc, v) => acc * v, 1);
       const prev = ctx.outputs.get(block.id);
       ctx.outputs.set(block.id, out);
       return { updated: prev !== out && !(Number.isNaN(prev) && Number.isNaN(out)) };
