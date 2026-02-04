@@ -616,6 +616,12 @@ export const generateC = (diagram, { sampleTime = 0.01, includeMain = true } = {
       lines.push(`  out_${bid} = ${terms.join(" + ")};`);
     } else if (type === "mult") {
       lines.push(`  out_${bid} = ${in0Expr} * ${in1Expr} * ${in2Expr};`);
+    } else if (type === "abs") {
+      lines.push(`  out_${bid} = fabs(${in0Expr});`);
+    } else if (type === "min") {
+      lines.push(`  out_${bid} = fmin(${in0Expr}, ${in1Expr});`);
+    } else if (type === "max") {
+      lines.push(`  out_${bid} = fmax(${in0Expr}, ${in1Expr});`);
     } else if (type === "saturation") {
       const maxVal = resolveNumeric(params.max, variables);
       const minVal = resolveNumeric(params.min, variables);

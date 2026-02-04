@@ -5,6 +5,9 @@ export const mathLibrary = {
     { type: "gain", label: "Gain" },
     { type: "sum", label: "Addition" },
     { type: "mult", label: "Multiplication" },
+    { type: "abs", label: "Absolute value" },
+    { type: "min", label: "Min" },
+    { type: "max", label: "Max" },
   ],
 };
 
@@ -99,6 +102,54 @@ export const createMathTemplates = (helpers) => {
         });
         group.appendChild(mathGroup);
         renderTeXMath(mathGroup, `${block.params.gain}`, block.width, block.height);
+      },
+    },
+    abs: {
+      width: 80,
+      height: 80,
+      inputs: [{ x: 0, y: 40, side: "left" }],
+      outputs: [{ x: 80, y: 40, side: "right" }],
+      defaultParams: {},
+      render: (block) => {
+        const group = block.group;
+        group.appendChild(createSvgElement("rect", { x: 0, y: 0, width: block.width, height: block.height, class: "block-body" }));
+        const mathGroup = createSvgElement("g", { class: "math-block minmax-math" });
+        group.appendChild(mathGroup);
+        renderTeXMath(mathGroup, "\\left|x\\right|", block.width, block.height);
+      },
+    },
+    min: {
+      width: 80,
+      height: 80,
+      inputs: [
+        { x: 0, y: 20, side: "left" },
+        { x: 0, y: 60, side: "left" },
+      ],
+      outputs: [{ x: 80, y: 40, side: "right" }],
+      defaultParams: {},
+      render: (block) => {
+        const group = block.group;
+        group.appendChild(createSvgElement("rect", { x: 0, y: 0, width: block.width, height: block.height, class: "block-body" }));
+        const mathGroup = createSvgElement("g", { class: "math-block minmax-math" });
+        group.appendChild(mathGroup);
+        renderTeXMath(mathGroup, "\\scriptsize\\min", block.width, block.height);
+      },
+    },
+    max: {
+      width: 80,
+      height: 80,
+      inputs: [
+        { x: 0, y: 20, side: "left" },
+        { x: 0, y: 60, side: "left" },
+      ],
+      outputs: [{ x: 80, y: 40, side: "right" }],
+      defaultParams: {},
+      render: (block) => {
+        const group = block.group;
+        group.appendChild(createSvgElement("rect", { x: 0, y: 0, width: block.width, height: block.height, class: "block-body" }));
+        const mathGroup = createSvgElement("g", { class: "math-block" });
+        group.appendChild(mathGroup);
+        renderTeXMath(mathGroup, "\\scriptsize\\max", block.width, block.height);
       },
     },
   };

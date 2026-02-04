@@ -482,6 +482,18 @@ export const generatePython = (diagram, { sampleTime = 0.01, includeMain = true 
       lines.push(`    out["${bid}"] = ${in0Expr} * ${in1Expr} * ${in2Expr}`);
       return;
     }
+    if (type === "abs") {
+      lines.push(`    out["${bid}"] = abs(${in0Expr})`);
+      return;
+    }
+    if (type === "min") {
+      lines.push(`    out["${bid}"] = min(${in0Expr}, ${in1Expr})`);
+      return;
+    }
+    if (type === "max") {
+      lines.push(`    out["${bid}"] = max(${in0Expr}, ${in1Expr})`);
+      return;
+    }
 
     if (type === "saturation") {
       lines.push(`    out["${bid}"] = np.clip(${in0Expr}, ${resolveNumeric(params.min, variables)}, ${resolveNumeric(params.max, variables)})`);

@@ -794,6 +794,12 @@ body[data-theme="noir-cyan"] {
   color: #1b1a17;
 }
 
+.minmax-math .math-foreign,
+.minmax-math .math-foreign mjx-container {
+  line-height: 1;
+  transform: translateY(-0.125em);
+}
+
 .gain-math .math-foreign,
 .gain-math .math-foreign mjx-container {
   font-size: 28px;
