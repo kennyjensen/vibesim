@@ -48,7 +48,7 @@ export function simulate({ state, runtimeInput, statusEl }) {
     if (conn.toIndex < inputs.length) inputs[conn.toIndex] = conn.from;
   });
 
-  const dt = 0.01;
+  const dt = Math.max(1e-6, Number(state.sampleTime ?? variables.dt ?? variables.sampleTime ?? 0.01) || 0.01);
   const duration = Math.max(0.1, Number(runtimeInput.value) || 10);
   const samples = Math.floor(duration / dt);
   const time = [];

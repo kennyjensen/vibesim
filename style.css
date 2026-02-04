@@ -458,6 +458,10 @@ body[data-theme="noir-cyan"] {
   width: 100%;
 }
 
+.sim-panel .sim-run {
+  margin-top: 4px;
+}
+
 .runtime-row .secondary {
   padding: 8px 12px;
   white-space: nowrap;
@@ -1143,10 +1147,13 @@ body[data-theme="noir-cyan"] {
 
 .param {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   white-space: nowrap;
-  align-self: flex-start;
+  align-self: stretch;
+  font-size: 0.9rem;
 }
 
 .param > input,
@@ -1161,7 +1168,7 @@ body[data-theme="noir-cyan"] {
 
 .param > input,
 .param > select {
-  width: 100%;
+  width: 120px;
 }
 
 #errorBox {

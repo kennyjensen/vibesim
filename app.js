@@ -19,7 +19,7 @@ const loadBtn = document.getElementById("loadBtn");
 const loadInput = document.getElementById("loadInput");
 const codegenBtn = document.getElementById("codegenBtn");
 const codegenLang = document.getElementById("codegenLang");
-const codegenDt = document.getElementById("codegenDt");
+const simDt = document.getElementById("simDt");
 const codegenIncludeMain = document.getElementById("codegenIncludeMain");
 const diagramNameInput = document.getElementById("diagramName");
 const marginOutputText = document.getElementById("marginOutputText");
@@ -119,6 +119,7 @@ const state = {
   variablesDisplay: [],
   diagramName: "vibesim",
   selectedLoopKey: null,
+  sampleTime: 0.01,
 };
 
 let fitToDiagram = () => {};
@@ -1122,6 +1123,15 @@ function init() {
   });
 
   const handleRun = () => simulate({ state, runtimeInput, statusEl });
+  if (simDt) {
+    const updateSimDt = () => {
+      const value = Number(simDt.value);
+      state.sampleTime = Number.isFinite(value) && value > 0 ? value : 0.01;
+    };
+    updateSimDt();
+    simDt.addEventListener("input", updateSimDt);
+    simDt.addEventListener("change", updateSimDt);
+  }
   if (runButtons.length) {
     runButtons.forEach((button) => button.addEventListener("click", handleRun));
   } else if (runBtn) {
@@ -1142,14 +1152,14 @@ function init() {
           "[codegen] start",
           `lang=${lang}`,
           `includeMain=${includeMain}`,
-          `sampleTime=${codegenDt?.value ?? 0.01}`,
+          `sampleTime=${simDt?.value ?? 0.01}`,
           `blocks=${diagram.blocks.length} connections=${diagram.connections.length}`,
         ].join("\n");
       }
       try {
         const content = generateCode({
           lang,
-          sampleTime: codegenDt?.value ?? 0.01,
+          sampleTime: simDt?.value ?? 0.01,
           includeMain,
           diagram,
         });
