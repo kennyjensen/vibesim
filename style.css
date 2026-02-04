@@ -1168,7 +1168,7 @@ body[data-theme="noir-cyan"] {
 
 .param > input,
 .param > select {
-  width: 120px;
+  width: 180px;
 }
 
 #errorBox {
