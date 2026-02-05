@@ -2422,6 +2422,7 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
     block.height = height;
     updateScopeLayout(block);
     state.routingDirty = true;
+    if (state.dirtyBlocks) state.dirtyBlocks.add(block.id);
     updateConnections(true);
   }
 
