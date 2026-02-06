@@ -643,6 +643,16 @@ export const generateC = (diagram, { sampleTime = 0.01, includeMain = true } = {
       lines.push(`  out_${bid} = fmin(${in0Expr}, ${in1Expr});`);
     } else if (type === "max") {
       lines.push(`  out_${bid} = fmax(${in0Expr}, ${in1Expr});`);
+    } else if (type === "switch") {
+      const condition = String(params.condition || "ge");
+      const threshold = formatNumber(resolveNumeric(params.threshold, variables));
+      if (condition === "gt") {
+        lines.push(`  out_${bid} = (${in1Expr} > ${threshold}) ? ${in0Expr} : ${in2Expr};`);
+      } else if (condition === "ne") {
+        lines.push(`  out_${bid} = (${in1Expr} != ${threshold}) ? ${in0Expr} : ${in2Expr};`);
+      } else {
+        lines.push(`  out_${bid} = (${in1Expr} >= ${threshold}) ? ${in0Expr} : ${in2Expr};`);
+      }
     } else if (type === "userFunc") {
       const raw = String(params.expr ?? "u");
       const expr = sanitizeExpression(raw).replace(/\bu\b/g, `(${in0Expr})`);

@@ -499,6 +499,28 @@ export const createInspector = ({
       });
     } else if (block.type === "mult") {
       inspectorBody.innerHTML = `<div class="param">Multiply inputs</div>`;
+    } else if (block.type === "switch") {
+      inspectorBody.innerHTML = `
+        <label class="param">Condition
+          <select data-edit="condition">
+            <option value="ge" ${block.params.condition === "ge" ? "selected" : ""}>&ge;</option>
+            <option value="gt" ${block.params.condition === "gt" ? "selected" : ""}>&gt;</option>
+            <option value="ne" ${block.params.condition === "ne" ? "selected" : ""}>&ne;</option>
+          </select>
+        </label>
+        <label class="param">Threshold
+          <input type="text" data-edit="threshold" value="${block.params.threshold ?? 0.0}" step="0.1">
+        </label>
+      `;
+      const conditionInput = inspectorBody.querySelector("select[data-edit='condition']");
+      const thresholdInput = inspectorBody.querySelector("input[data-edit='threshold']");
+      const update = () => {
+        block.params.condition = conditionInput.value;
+        block.params.threshold = thresholdInput.value;
+        renderer.updateBlockLabel(block);
+      };
+      conditionInput.addEventListener("change", update);
+      thresholdInput.addEventListener("input", update);
     } else if (block.type === "saturation") {
       inspectorBody.innerHTML = `
         <label class="param">Min

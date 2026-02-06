@@ -524,6 +524,18 @@ export const generatePython = (diagram, { sampleTime = 0.01, includeMain = true 
       lines.push(`    out["${bid}"] = max(${in0Expr}, ${in1Expr})`);
       return;
     }
+    if (type === "switch") {
+      const condition = String(params.condition || "ge");
+      const threshold = formatNumber(resolveNumeric(params.threshold, variables));
+      if (condition === "gt") {
+        lines.push(`    out["${bid}"] = ${in0Expr} if (${in1Expr} > ${threshold}) else ${in2Expr}`);
+      } else if (condition === "ne") {
+        lines.push(`    out["${bid}"] = ${in0Expr} if (${in1Expr} != ${threshold}) else ${in2Expr}`);
+      } else {
+        lines.push(`    out["${bid}"] = ${in0Expr} if (${in1Expr} >= ${threshold}) else ${in2Expr}`);
+      }
+      return;
+    }
     if (type === "userFunc") {
       const raw = String(params.expr ?? "u");
       const expr = pythonMathExpr(raw).replace(/\bu\b/g, `(${in0Expr})`);

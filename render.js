@@ -3098,6 +3098,29 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
       const mathGroup = block.group.querySelector(".pid-math");
       if (mathGroup) renderTeXMath(mathGroup, "\\mathsf{PID}", block.width, block.height);
     }
+    if (block.type === "switch") {
+      const mathGroup = block.group.querySelector(".switch-math");
+      if (mathGroup) {
+        const op = block.params.condition === "gt"
+          ? ">"
+          : block.params.condition === "ne"
+            ? "\\ne"
+            : "\\geq";
+        const rawThreshold = block.params.threshold ?? 0;
+        const threshold = String(rawThreshold).trim() || "0";
+        const len = threshold.length;
+        mathGroup.classList.remove("switch-math--l", "switch-math--m", "switch-math--s");
+        if (len > 9) {
+          mathGroup.classList.add("switch-math--s");
+        } else if (len >= 3) {
+          mathGroup.classList.add("switch-math--m");
+        } else {
+          mathGroup.classList.add("switch-math--l");
+        }
+        mathGroup.setAttribute("transform", "translate(0 17)");
+        renderTeXMath(mathGroup, `${op}\\ ${threshold}`, 48, 34);
+      }
+    }
     if (block.type === "zoh") {
       const mathGroup = block.group.querySelector(".zoh-math");
       if (mathGroup) renderTeXMath(mathGroup, "\\mathsf{ZOH}", block.width, block.height);

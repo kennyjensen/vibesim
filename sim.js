@@ -24,6 +24,7 @@ export function simulate({ state, runtimeInput, statusEl, downloadFile }) {
     if (block.type === "fileSource" || block.type === "fileSink") {
       if (key === "path" || key === "times" || key === "values" || key === "lastCsv") return value;
     }
+    if (block.type === "switch" && key === "condition") return value;
     if (key === "signs") return value;
     if (Array.isArray(value)) return value.map((v) => {
       const out = evalExpression(v, variables);

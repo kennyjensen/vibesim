@@ -1004,6 +1004,23 @@ body[data-theme="noir-cyan"] {
   stroke-width: 2;
 }
 
+.switch-dot {
+  fill: #3c3c3c;
+}
+
+.switch-math--l .katex {
+  font-size: 0.48em;
+}
+
+.switch-math--m .katex {
+  font-size: 0.38em;
+}
+
+.switch-math--s .katex {
+  font-size: 0.30em;
+}
+
+
 .sum-sign {
   fill: #3c3c3c;
   font-size: 28px;

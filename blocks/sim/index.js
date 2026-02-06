@@ -4,6 +4,7 @@ import { nonlinearSimHandlers } from "./nonlinear.js";
 import { continuousSimHandlers } from "./continuous.js";
 import { discreteSimHandlers } from "./discrete.js";
 import { sinkSimHandlers } from "./sink.js";
+import { utilitySimHandlers } from "./utility.js";
 
 export const simHandlers = {
   ...sourceSimHandlers,
@@ -11,6 +12,7 @@ export const simHandlers = {
   ...nonlinearSimHandlers,
   ...continuousSimHandlers,
   ...discreteSimHandlers,
+  ...utilitySimHandlers,
   ...sinkSimHandlers,
 };
 

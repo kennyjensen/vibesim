@@ -4,6 +4,7 @@ import { mathLibrary, createMathTemplates } from "./math.js";
 import { discreteLibrary, createDiscreteTemplates } from "./discrete.js";
 import { nonlinearLibrary, createNonlinearTemplates } from "./nonlinear.js";
 import { sinkLibrary, createSinkTemplates } from "./sink.js";
+import { utilityLibrary, createUtilityTemplates } from "./utility.js";
 
 export const blockLibrary = [
   sourceLibrary,
@@ -11,6 +12,7 @@ export const blockLibrary = [
   mathLibrary,
   discreteLibrary,
   nonlinearLibrary,
+  utilityLibrary,
   sinkLibrary,
 ];
 
@@ -20,5 +22,6 @@ export const buildBlockTemplates = (helpers) => ({
   ...createMathTemplates(helpers),
   ...createDiscreteTemplates(helpers),
   ...createNonlinearTemplates(helpers),
+  ...createUtilityTemplates(helpers),
   ...createSinkTemplates(helpers),
 });
