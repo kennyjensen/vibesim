@@ -7,6 +7,12 @@ function roundToSignificant(value, digits = 2) {
   return Number(value.toPrecision(digits));
 }
 
+function refreshParamDisplay(scopeBlock) {
+  if (typeof window === "undefined") return;
+  if (typeof window.vibesimUpdateParamDisplay !== "function") return;
+  window.vibesimUpdateParamDisplay(scopeBlock?.id);
+}
+
 export function simulate({ state, runtimeInput, statusEl, downloadFile }) {
   statusEl.textContent = "Running...";
   const blocks = Array.from(state.blocks.values());
@@ -258,6 +264,7 @@ export function renderScope(scopeBlock) {
       yMin: yMinParam != null ? yMinParam : -1.2,
       yMax: yMaxParam != null ? yMaxParam : 1.2,
     };
+    refreshParamDisplay(scopeBlock);
     return;
   }
 
@@ -372,6 +379,7 @@ export function renderScope(scopeBlock) {
     yMin: minVal,
     yMax: maxVal,
   };
+  refreshParamDisplay(scopeBlock);
 
   if (scopeBlock.scopeHoverX == null) return;
   const clampedX = Math.min(plotX + plotW, Math.max(plotX, scopeBlock.scopeHoverX));
@@ -425,6 +433,7 @@ export function renderXYScope(scopeBlock) {
     scopeBlock.scopePaths.forEach((path) => path.setAttribute("d", ""));
     if (scopeBlock.scopeAxes?.xTickLabels) scopeBlock.scopeAxes.xTickLabels.forEach((label) => label.setAttribute("display", "none"));
     if (scopeBlock.scopeAxes?.yTickLabels) scopeBlock.scopeAxes.yTickLabels.forEach((label) => label.setAttribute("display", "none"));
+    refreshParamDisplay(scopeBlock);
     return;
   }
   const plot = scopeBlock.scopePlot;
@@ -489,6 +498,7 @@ export function renderXYScope(scopeBlock) {
       yMin: yMinParam != null ? yMinParam : -1.2,
       yMax: yMaxParam != null ? yMaxParam : 1.2,
     };
+    refreshParamDisplay(scopeBlock);
     return;
   }
   let xMin = Math.min(...pairs.map((p) => p.x));
@@ -603,6 +613,7 @@ export function renderXYScope(scopeBlock) {
     yMin,
     yMax,
   };
+  refreshParamDisplay(scopeBlock);
 }
 
 export const __testOnly = {

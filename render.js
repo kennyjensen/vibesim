@@ -25,6 +25,8 @@ const USERFUNC_PADDING_X = 12;
 const USERFUNC_PADDING_Y = 16;
 const USERFUNC_SETTLE_RETRIES = 4;
 const USERFUNC_SETTLE_DELAY_MS = 60;
+const TF_MIN_WIDTH = 160;
+const DTF_MIN_WIDTH = 140;
 
 function createSvgElement(tag, attrs = {}, text = "") {
   const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
@@ -61,7 +63,12 @@ const userFuncResizeAttempts = new Map();
 function notifyUserFuncResize(group) {
   const blockEl = group?.closest?.(".svg-block");
   const blockId = blockEl?.dataset?.blockId;
-  if (blockId && typeof window !== "undefined" && window.vibesimResizeUserFunc) {
+  if (!blockId || typeof window === "undefined") return;
+  if (typeof window.vibesimResizeMathBlock === "function") {
+    window.vibesimResizeMathBlock(blockId);
+    return;
+  }
+  if (typeof window.vibesimResizeUserFunc === "function") {
     window.vibesimResizeUserFunc(blockId);
   }
 }
@@ -1045,7 +1052,7 @@ export function createRenderer({
     };
 
     template.render(block);
-    if (type === "userFunc") {
+    if (type === "userFunc" || type === "tf" || type === "dtf") {
       resizeUserFuncFromLabel(block, { force: true });
     }
 
@@ -2843,6 +2850,46 @@ export function createRenderer({
     };
   }
 
+  function getAutoMathConfig(block) {
+    if (!block) return null;
+    if (block.type === "userFunc") {
+      return {
+        className: ".userfunc-math",
+        minWidth: USERFUNC_MIN_WIDTH,
+        fixedHeight: USERFUNC_FIXED_HEIGHT,
+        paddingX: USERFUNC_PADDING_X,
+      };
+    }
+    if (block.type === "tf") {
+      return {
+        className: ".tf-math",
+        minWidth: TF_MIN_WIDTH,
+        fixedHeight: 80,
+        paddingX: USERFUNC_PADDING_X,
+      };
+    }
+    if (block.type === "dtf") {
+      return {
+        className: ".dtf-math",
+        minWidth: DTF_MIN_WIDTH,
+        fixedHeight: 80,
+        paddingX: USERFUNC_PADDING_X,
+      };
+    }
+    return null;
+  }
+
+  function computeRenderedAutoMathSize(block, mathGroup) {
+    const config = getAutoMathConfig(block);
+    if (!config) return null;
+    const size = getMathSpanSize(mathGroup);
+    if (!size) return null;
+    return {
+      width: Math.max(config.minWidth, Math.ceil(size.w + config.paddingX * 2)),
+      height: config.fixedHeight,
+    };
+  }
+
   function positionGainMath(mathGroup, block, padding = 8) {
     if (!mathGroup || !block) return;
     const size = getMathSpanSize(mathGroup);
@@ -2857,10 +2904,18 @@ export function createRenderer({
   }
 
   function resizeUserFuncFromLabel(block, { force = false } = {}) {
-    if (!block || block.type !== "userFunc") return;
-    const mathGroup = block.group.querySelector(".userfunc-math");
-    const { width, height } = computeUserFuncSize(block, { force, mathGroup });
-    applyUserFuncSize(block, width, height, { force });
+    const config = getAutoMathConfig(block);
+    if (!config) return;
+    const mathGroup = block.group.querySelector(config.className);
+    if (!mathGroup) return;
+    if (block.type === "userFunc") {
+      const { width, height } = computeUserFuncSize(block, { force, mathGroup });
+      applyUserFuncSize(block, width, height, { force });
+    } else {
+      const rendered = computeRenderedAutoMathSize(block, mathGroup);
+      const width = rendered ? rendered.width : Math.max(block.width, config.minWidth);
+      applyUserFuncSize(block, width, config.fixedHeight, { force });
+    }
     scheduleUserFuncFit(block);
   }
 
@@ -2874,7 +2929,8 @@ export function createRenderer({
       body.setAttribute("width", width);
       body.setAttribute("height", height);
     }
-    const mathGroup = block.group.querySelector(".userfunc-math");
+    const config = getAutoMathConfig(block);
+    const mathGroup = config ? block.group.querySelector(config.className) : null;
     if (mathGroup) {
       const foreign = mathGroup.querySelector("foreignObject");
       if (foreign) {
@@ -2926,7 +2982,8 @@ export function createRenderer({
   }
 
   function scheduleUserFuncFit(block) {
-    if (!block || block.type !== "userFunc") return;
+    const config = getAutoMathConfig(block);
+    if (!config) return;
     const id = block.id;
     const attempts = userFuncResizeAttempts.get(id) || 0;
     if (attempts >= USERFUNC_SETTLE_RETRIES) {
@@ -2935,14 +2992,14 @@ export function createRenderer({
     }
     userFuncResizeAttempts.set(id, attempts + 1);
     setTimeout(() => {
-      const mathGroup = block.group?.querySelector?.(".userfunc-math");
-      const renderedSize = computeRenderedUserFuncSize(mathGroup);
+      const mathGroup = block.group?.querySelector?.(config.className);
+      const renderedSize = computeRenderedAutoMathSize(block, mathGroup);
       if (!renderedSize) return;
       if (renderedSize.width > block.width) {
         applyUserFuncSize(
           block,
           Math.max(block.width, renderedSize.width),
-          USERFUNC_FIXED_HEIGHT,
+          config.fixedHeight,
           { force: true }
         );
         scheduleUserFuncFit(block);
@@ -2953,11 +3010,22 @@ export function createRenderer({
   }
 
   if (typeof window !== "undefined") {
-    window.vibesimResizeUserFunc = (blockId) => {
+    window.vibesimResizeMathBlock = (blockId) => {
       const block = state.blocks.get(blockId);
-      if (block?.type === "userFunc") {
+      if (block && (block.type === "userFunc" || block.type === "tf" || block.type === "dtf")) {
         resizeUserFuncFromLabel(block, { force: true });
       }
+    };
+    window.vibesimResizeUserFunc = (blockId) => {
+      const block = state.blocks.get(blockId);
+      if (block && (block.type === "userFunc" || block.type === "tf" || block.type === "dtf")) {
+        resizeUserFuncFromLabel(block, { force: true });
+      }
+    };
+    window.vibesimUpdateParamDisplay = (blockId) => {
+      const block = state.blocks.get(blockId);
+      if (!block) return;
+      updateParamDisplay(block);
     };
   }
 
@@ -3454,6 +3522,30 @@ export function createRenderer({
         resizeUserFuncFromLabel(block);
       }
     }
+    if (block.type === "tf") {
+      const mathGroup = block.group.querySelector(".tf-math");
+      if (mathGroup) {
+        renderTeXMath(
+          mathGroup,
+          buildTransferTeX(block.params.num, block.params.den),
+          block.width,
+          block.height
+        );
+        resizeUserFuncFromLabel(block);
+      }
+    }
+    if (block.type === "dtf") {
+      const mathGroup = block.group.querySelector(".dtf-math");
+      if (mathGroup) {
+        renderTeXMath(
+          mathGroup,
+          buildTransferTeX(block.params.num, block.params.den, "z"),
+          block.width,
+          block.height
+        );
+        resizeUserFuncFromLabel(block);
+      }
+    }
     if (block.type === "labelSource" || block.type === "labelSink") {
       const mathGroup = block.group.querySelector(".label-math");
       if (mathGroup) renderTeXMath(mathGroup, formatLabelTeX(block.params.name || ""), block.width, block.height);
@@ -3643,12 +3735,14 @@ export function createRenderer({
     };
 
     const getDisplayValue = (key) => {
+      const fallback = getScopeFallbackValue(key);
+      if (fallback != null) {
+        if (typeof fallback === "number" && Number.isFinite(fallback)) return String(fallback);
+        return String(fallback);
+      }
       const raw = block.params?.[key];
       if (raw != null && String(raw).trim() !== "") return String(raw);
-      const fallback = getScopeFallbackValue(key);
-      if (fallback == null) return "";
-      if (typeof fallback === "number" && Number.isFinite(fallback)) return String(fallback);
-      return String(fallback);
+      return "";
     };
 
     const textEl = block.paramDisplay;
