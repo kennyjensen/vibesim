@@ -8,7 +8,7 @@ export const utilityLibrary = {
 
 const conditionToLatex = (condition, threshold) => {
   const op = condition === "gt" ? ">" : condition === "ne" ? "\\ne" : "\\geq";
-  return `${op}\\ ${threshold}`;
+  return `${op}\\!${threshold}`;
 };
 
 export const createUtilityTemplates = (helpers) => {

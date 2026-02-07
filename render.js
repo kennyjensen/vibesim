@@ -3118,7 +3118,7 @@ export function createRenderer({ svg, blockLayer, wireLayer, overlayLayer, state
           mathGroup.classList.add("switch-math--l");
         }
         mathGroup.setAttribute("transform", "translate(0 17)");
-        renderTeXMath(mathGroup, `${op}\\ ${threshold}`, 48, 34);
+        renderTeXMath(mathGroup, `${op}\\!${threshold}`, 48, 34);
       }
     }
     if (block.type === "zoh") {
