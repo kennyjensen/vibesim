@@ -1,5 +1,5 @@
 version: 1
-name: Inverted Pendulum
+name: "Inverted Pendulum"
 blocks:
   -
     id: b2
@@ -104,39 +104,47 @@ connections:
     to: b3
     fromIndex: 0
     toIndex: 0
+    points: [[2030,1470],[2080,1470]]
   -
     from: b3
     to: b4
     fromIndex: 0
     toIndex: 0
+    points: [[2160,1470],[2200,1470]]
   -
     from: b4
     to: b2
     fromIndex: 0
     toIndex: 1
+    points: [[2360,1470],[2390,1470],[2390,1400],[2010,1400],[2010,1450]]
   -
     from: b6
     to: b2
     fromIndex: 0
     toIndex: 0
+    points: [[1910,1470],[1990,1470]]
   -
     from: b4
     to: b7
     fromIndex: 0
     toIndex: 0
+    points: [[2360,1470],[2470,1470]]
   -
     from: b8
     to: b9
     fromIndex: 0
     toIndex: 0
+    points: [[1970,1650],[2050,1650]]
   -
     from: b11
     to: b10
     fromIndex: 0
     toIndex: 0
+    points: [[2180,1650],[2270,1650]]
   -
     from: b12
     to: b10
     fromIndex: 0
     toIndex: 1
+    points: [[2180,1770],[2230,1770],[2230,1690],[2270,1690]]
 variables: "m=1\ng=9.81\nI=m\nmg=m*g\nk=1"

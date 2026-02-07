@@ -1,5 +1,5 @@
 version: 1
-name: Complementary Filter
+name: "Complementary Filter"
 blocks:
   -
     id: b1
@@ -35,7 +35,7 @@ blocks:
     y: 1990
     rotation: 0
     params:
-      {}: null
+      {}
   -
     id: b5
     type: sine
@@ -91,7 +91,7 @@ blocks:
     y: 1990
     rotation: 0
     params:
-      {}: null
+      {}
   -
     id: b11
     type: scope
@@ -111,60 +111,72 @@ connections:
     to: b3
     fromIndex: 0
     toIndex: 1
+    points: [[2490,1870],[2570,1870],[2570,1920]]
   -
     from: b2
     to: b3
     fromIndex: 0
     toIndex: 2
+    points: [[2490,2030],[2570,2030],[2570,1960]]
   -
     from: b10
     to: b2
     fromIndex: 0
     toIndex: 0
+    points: [[2340,2030],[2410,2030]]
   -
     from: b6
     to: b9
     fromIndex: 0
     toIndex: 2
+    points: [[2070,2170],[2170,2170],[2170,2050]]
   -
     from: b9
     to: b10
     fromIndex: 0
     toIndex: 0
+    points: [[2190,2030],[2260,2030]]
   -
     from: b8
     to: b1
     fromIndex: 0
     toIndex: 0
+    points: [[2190,1870],[2410,1870]]
   -
     from: b7
     to: b8
     fromIndex: 0
     toIndex: 1
+    points: [[2070,1750],[2170,1750],[2170,1850]]
   -
     from: b5
     to: b8
     fromIndex: 0
     toIndex: 0
+    points: [[1920,1870],[2150,1870]]
   -
     from: b5
     to: b4
     fromIndex: 0
     toIndex: 0
+    points: [[1920,1870],[1950,1870],[1950,2030],[1990,2030]]
   -
     from: b4
     to: b9
     fromIndex: 0
     toIndex: 0
+    points: [[2070,2030],[2150,2030]]
   -
     from: b5
     to: b11
     fromIndex: 0
     toIndex: 0
+    points: [[1920,1870],[1960,1870],[1960,1680],[2660,1680],[2660,1820],[2700,1820]]
   -
     from: b3
     to: b11
     fromIndex: 0
     toIndex: 2
+    points: [[2590,1940],[2660,1940],[2660,1900],[2700,1900]]
 variables: ""
 runtime: 10

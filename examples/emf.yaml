@@ -1,5 +1,5 @@
 version: 1
-name: EMF Model
+name: "EMF Model"
 blocks:
   -
     id: b1
@@ -169,79 +169,95 @@ connections:
     to: b5
     fromIndex: 0
     toIndex: 0
+    points: [[2480,1650],[2530,1650]]
   -
     from: b1
     to: b2
     fromIndex: 0
     toIndex: 0
+    points: [[1890,1650],[1970,1650]]
   -
     from: b2
     to: b7
     fromIndex: 0
     toIndex: 0
+    points: [[2130,1650],[2230,1650],[2230,1900],[2270,1900]]
   -
     from: b8
     to: b6
     fromIndex: 0
     toIndex: 0
+    points: [[2460,1880],[2460,1820]]
   -
     from: b5
     to: b9
     fromIndex: 0
     toIndex: 0
+    points: [[2690,1650],[2780,1650]]
   -
     from: b5
     to: b8
     fromIndex: 0
     toIndex: 2
+    points: [[2690,1650],[2720,1650],[2720,1900],[2480,1900]]
   -
     from: b10
     to: b13
     fromIndex: 0
     toIndex: 0
+    points: [[1960,2050],[2030,2050]]
   -
     from: b11
     to: b14
     fromIndex: 0
     toIndex: 0
+    points: [[2400,2100],[2690,2100]]
   -
     from: b2
     to: b15
     fromIndex: 0
     toIndex: 0
+    points: [[2130,1650],[2220,1650],[2220,1550],[2260,1550]]
   -
     from: b7
     to: b8
     fromIndex: 0
     toIndex: 1
+    points: [[2350,1900],[2440,1900]]
   -
     from: b16
     to: b14
     fromIndex: 0
     toIndex: 2
+    points: [[2400,2280],[2650,2280],[2650,2180],[2690,2180]]
   -
     from: b7
     to: b17
     fromIndex: 0
     toIndex: 0
+    points: [[2350,1900],[2400,1900],[2400,1990],[2460,1990]]
   -
     from: b2
     to: b18
     fromIndex: 0
     toIndex: 0
+    points: [[2130,1650],[2270,1650]]
   -
     from: b6
     to: b4
     fromIndex: 0
     toIndex: 2
+    points: [[2460,1740],[2460,1670]]
   -
     from: b12
     to: b14
     fromIndex: 0
     toIndex: 1
+    points: [[2400,2190],[2620,2190],[2620,2140],[2690,2140]]
   -
     from: b18
     to: b4
     fromIndex: 0
     toIndex: 0
+    points: [[2370,1650],[2440,1650]]
 variables: "m=1\ng=9.81\nI=m\nmg=m*g\nk=1\nK=1\ntau=1"
