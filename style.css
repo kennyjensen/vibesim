@@ -702,6 +702,10 @@ body[data-theme="noir-cyan"] {
   display: none !important;
 }
 
+body.is-root-diagram #subsystemUpBtn {
+  display: none !important;
+}
+
 .floating-btn {
   width: 40px;
   height: 40px;

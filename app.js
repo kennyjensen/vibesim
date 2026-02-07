@@ -210,7 +210,10 @@ const buildSubsystemSpec = (data, fallbackName = "Subsystem") => {
 
 const updateSubsystemNavUi = () => {
   if (!subsystemUpBtn) return;
-  subsystemUpBtn.hidden = state.subsystemStack.length === 0;
+  const isRoot = state.subsystemStack.length === 0;
+  subsystemUpBtn.hidden = isRoot;
+  subsystemUpBtn.setAttribute("aria-hidden", String(isRoot));
+  document.body.classList.toggle("is-root-diagram", isRoot);
 };
 
 function openSubsystemFromBlock(block) {
@@ -1465,7 +1468,7 @@ function init() {
     });
   }
 
-  deleteSelectionBtn.addEventListener("click", () => {
+  const handleDeleteSelection = () => {
     if (state.selectedId) {
       renderer.deleteBlock(state.selectedId);
       renderer.selectBlock(null);
@@ -1479,6 +1482,19 @@ function init() {
       statusEl.textContent = "Wire deleted";
       updateStabilityPanel();
     }
+  };
+
+  deleteSelectionBtn.addEventListener("click", handleDeleteSelection);
+  window.addEventListener("keydown", (event) => {
+    if (event.key !== "Delete") return;
+    const target = event.target;
+    const isEditable =
+      target &&
+      (target.isContentEditable ||
+        ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+    if (isEditable) return;
+    handleDeleteSelection();
+    event.preventDefault();
   });
 
   rotateSelectionBtn.addEventListener("click", () => {
