@@ -3351,11 +3351,11 @@ export function createRenderer({
             : "\\geq";
         const rawThreshold = block.params.threshold ?? 0;
         const threshold = String(rawThreshold).trim() || "0";
-        const len = threshold.length;
+        const digitCount = (threshold.match(/\d/g) || []).length;
         mathGroup.classList.remove("switch-math--l", "switch-math--m", "switch-math--s");
-        if (len > 9) {
+        if (digitCount > 8) {
           mathGroup.classList.add("switch-math--s");
-        } else if (len >= 3) {
+        } else if (digitCount >= 3) {
           mathGroup.classList.add("switch-math--m");
         } else {
           mathGroup.classList.add("switch-math--l");

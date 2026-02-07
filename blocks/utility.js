@@ -54,7 +54,7 @@ export const createUtilityTemplates = (helpers) => {
         group.appendChild(createSvgElement("circle", { cx: 64, cy: 40, r: 2.8, class: "switch-dot" }));
 
         const mathGroup = createSvgElement("g", {
-          class: "switch-math switch-math--m",
+          class: "switch-math switch-math--l",
           transform: "translate(0 17)",
         });
         group.appendChild(mathGroup);

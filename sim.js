@@ -76,6 +76,9 @@ export function simulate({ state, runtimeInput, statusEl, downloadFile }) {
     if (handler?.init) handler.init(ctx, block);
   });
 
+  let algebraicLoopFailed = false;
+  let algebraicLoopTime = 0;
+
   for (let i = 0; i <= samples; i += 1) {
     const t = i * dt;
     time.push(t);
@@ -106,6 +109,11 @@ export function simulate({ state, runtimeInput, statusEl, downloadFile }) {
       });
       if (resolveLabelSources()) progress = true;
     }
+    if (progress && iter >= maxIter) {
+      algebraicLoopFailed = true;
+      algebraicLoopTime = t;
+      break;
+    }
 
     blocks.forEach((block) => {
       const handler = simHandlers[block.type];
@@ -116,6 +124,11 @@ export function simulate({ state, runtimeInput, statusEl, downloadFile }) {
       const handler = simHandlers[block.type];
       if (handler?.update) handler.update(ctx, block);
     });
+  }
+
+  if (algebraicLoopFailed) {
+    statusEl.textContent = `Error: algebraic loop did not converge at t=${algebraicLoopTime.toFixed(6)} s`;
+    return;
   }
 
   blocks.forEach((block) => {

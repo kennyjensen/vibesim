@@ -59,6 +59,8 @@ const INPUT_COUNTS = {
   backlash: 1,
   zoh: 1,
   foh: 1,
+  switch: 3,
+  subsystem: 1,
   scope: 3,
   fileSink: 1,
   labelSink: 1,
@@ -259,6 +261,12 @@ export function runJsSimOutputs(diagram, duration = DURATION, dt = SAMPLE_TIME) 
   const resolveParam = (value, block, key) => {
     if (block.type === "labelSource" || block.type === "labelSink") {
       if (key === "name") return value;
+    }
+    if (block.type === "switch" && key === "condition") {
+      return value;
+    }
+    if (block.type === "subsystem" && (key === "name" || key === "externalInputs" || key === "externalOutputs" || key === "subsystem")) {
+      return value;
     }
     if (block.type === "fileSource" || block.type === "fileSink") {
       if (key === "path" || key === "times" || key === "values" || key === "lastCsv") return value;

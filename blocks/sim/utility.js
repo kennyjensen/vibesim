@@ -233,29 +233,47 @@ const advanceSubsystemState = (outerCtx, stateData) => {
 
 export const utilitySimHandlers = {
   switch: {
+    init: (ctx, block) => {
+      const state = ctx.blockState.get(block.id) || {};
+      if (!Number.isFinite(state.output)) state.output = 0;
+      ctx.blockState.set(block.id, state);
+    },
     algebraic: (ctx, block) => {
       const values = getInputValues(ctx, block);
       const inputs = ctx.inputMap.get(block.id) || [];
-      let missing = false;
-      const resolved = [0, 1, 2].map((idx) => {
+      const state = ctx.blockState.get(block.id) || {};
+      const prevOutput = Number.isFinite(state.output) ? state.output : 0;
+      const readInput = (idx, fallback = 0) => {
         const fromId = inputs[idx];
-        if (!fromId) return 0;
-        if (!ctx.outputs.has(fromId)) {
-          missing = true;
-          return 0;
-        }
-        return values[idx] ?? 0;
-      });
-      if (missing) return null;
+        if (!fromId) return { has: true, value: fallback };
+        if (!ctx.outputs.has(fromId)) return { has: false, value: fallback };
+        return { has: true, value: values[idx] ?? fallback };
+      };
+      const top = readInput(0, 0);
+      const cond = readInput(1, 0);
+      const bottom = readInput(2, 0);
 
       const params = ctx.resolvedParams.get(block.id) || {};
       const condition = String(params.condition || "ge");
       const threshold = Number(params.threshold);
       const thresholdValue = Number.isFinite(threshold) ? threshold : 0;
-      const condInput = resolved[1] ?? 0;
-      const out = conditionTrue(condition, condInput, thresholdValue) ? (resolved[0] ?? 0) : (resolved[2] ?? 0);
+      let out = prevOutput;
+      if (cond.has) {
+        const takeTop = conditionTrue(condition, cond.value ?? 0, thresholdValue);
+        if (takeTop && top.has) out = top.value ?? 0;
+        else if (!takeTop && bottom.has) out = bottom.value ?? 0;
+        else if (top.has) out = top.value ?? 0;
+        else if (bottom.has) out = bottom.value ?? 0;
+      } else if (bottom.has) {
+        out = bottom.value ?? 0;
+      } else if (top.has) {
+        out = top.value ?? 0;
+      }
+
       const prev = ctx.outputs.get(block.id);
       ctx.outputs.set(block.id, out);
+      state.output = out;
+      ctx.blockState.set(block.id, state);
       return { updated: prev !== out && !(Number.isNaN(prev) && Number.isNaN(out)) };
     },
   },
