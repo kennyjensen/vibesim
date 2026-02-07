@@ -18,6 +18,8 @@ export const FORCE_FULL_ROUTE_TIME_LIMIT_MS = 4000;
 const DEBUG_WIRE_CHECKS = false;
 const SELECTION_PAD = 10;
 const HOP_RADIUS = 4;
+const USERFUNC_MIN_WIDTH = 120;
+const USERFUNC_MIN_HEIGHT = 80;
 
 function createSvgElement(tag, attrs = {}, text = "") {
   const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
@@ -48,6 +50,9 @@ function renderSvgMath(group, mathMl, width, height) {
 
 let katexRetryScheduled = false;
 const katexQueue = new Set();
+let userFuncMeasureRoot = null;
+const userFuncResizeAttempts = new Map();
+const userFuncSizingDebug = new Map();
 
 function notifyUserFuncResize(group) {
   const blockEl = group?.closest?.(".svg-block");
@@ -55,6 +60,75 @@ function notifyUserFuncResize(group) {
   if (blockId && typeof window !== "undefined" && window.vibesimResizeUserFunc) {
     window.vibesimResizeUserFunc(blockId);
   }
+}
+
+function scheduleUserFuncResize(group) {
+  notifyUserFuncResize(group);
+  requestAnimationFrame(() => notifyUserFuncResize(group));
+  setTimeout(() => notifyUserFuncResize(group), 150);
+  if (typeof document === "undefined" || !document.fonts?.ready) return;
+  document.fonts.ready.then(() => {
+    requestAnimationFrame(() => notifyUserFuncResize(group));
+  });
+}
+
+function ensureUserFuncMeasureRoot() {
+  if (userFuncMeasureRoot || typeof document === "undefined") return userFuncMeasureRoot;
+  const wrapper = document.createElement("div");
+  wrapper.style.position = "absolute";
+  wrapper.style.left = "-100000px";
+  wrapper.style.top = "-100000px";
+  wrapper.style.visibility = "hidden";
+  wrapper.style.pointerEvents = "none";
+  const minmax = document.createElement("div");
+  minmax.className = "minmax-math";
+  const foreign = document.createElement("div");
+  foreign.className = "math-foreign";
+  foreign.style.whiteSpace = "nowrap";
+  minmax.appendChild(foreign);
+  wrapper.appendChild(minmax);
+  document.body.appendChild(wrapper);
+  userFuncMeasureRoot = { wrapper, foreign };
+  return userFuncMeasureRoot;
+}
+
+function measureUserFuncTex(tex) {
+  if (!tex || typeof document === "undefined") return null;
+  if (!window.katex || typeof window.katex.render !== "function") return null;
+  const root = ensureUserFuncMeasureRoot();
+  if (!root) return null;
+  root.foreign.innerHTML = "";
+  const span = document.createElement("span");
+  span.style.whiteSpace = "nowrap";
+  root.foreign.appendChild(span);
+  try {
+    window.katex.render(tex, span, { throwOnError: false });
+  } catch {
+    span.textContent = tex;
+  }
+  const target = root.foreign.querySelector(".katex") || span;
+  const rect = target.getBoundingClientRect();
+  const width = Math.max(rect.width, target.scrollWidth || 0);
+  const height = Math.max(rect.height, target.scrollHeight || 0);
+  if (!width || !height) return null;
+  return { w: width, h: height };
+}
+
+function setUserFuncSizingDebug(block, info) {
+  if (!block || typeof window === "undefined") return;
+  const lines = [
+    "[userFunc sizing]",
+    `blockId=${block.id}`,
+    `expr=${String(block.params?.expr || "u")}`,
+    `latex=${exprToLatex(String(block.params?.expr || "u"))}`,
+  ];
+  Object.entries(info || {}).forEach(([key, value]) => {
+    lines.push(`${key}=${value}`);
+  });
+  const text = lines.join("\n");
+  window.vibesimUserFuncSizing = text;
+  userFuncSizingDebug.set(block.id, text);
+  window.dispatchEvent(new CustomEvent("userFuncSizingDebug", { detail: { blockId: block.id, text } }));
 }
 
 function queueKatexRender() {
@@ -76,7 +150,7 @@ function queueKatexRender() {
           }
           span.classList.remove("katex-target");
         });
-        notifyUserFuncResize(group);
+        scheduleUserFuncResize(group);
       });
     } else if (katexQueue.size) {
       queueKatexRender();
@@ -105,7 +179,7 @@ function renderTeXMath(group, tex, width, height) {
     try {
       window.katex.render(tex, span, { throwOnError: false });
       span.classList.remove("katex-target");
-      notifyUserFuncResize(group);
+      scheduleUserFuncResize(group);
     } catch {
       span.textContent = tex;
     }
@@ -780,11 +854,10 @@ export function createRenderer({
   ensureWireArrowMarker();
   const debugLog = document.getElementById("debugLog");
   const copyDebugButton = document.getElementById("copyDebug");
-  if (!DEBUG_WIRE_CHECKS && debugLog) {
-    const panel = debugLog.closest(".debug-panel");
-    if (panel) panel.style.display = "none";
+  if (debugLog && copyDebugButton) {
+    copyDebugButton.style.display = DEBUG_WIRE_CHECKS ? "inline-flex" : "none";
   }
-  if (DEBUG_WIRE_CHECKS && debugLog && copyDebugButton) {
+  if (debugLog && copyDebugButton) {
     copyDebugButton.addEventListener("click", async () => {
       const text = debugLog.textContent || "";
       if (!text) return;
@@ -2554,12 +2627,17 @@ export function createRenderer({
   function getMathSpanSize(mathGroup) {
     const span = mathGroup?.querySelector?.("span");
     if (!span || span.classList.contains("katex-target")) return null;
-    const rect = span.getBoundingClientRect();
-    if (!rect.width || !rect.height) return null;
+    const target = mathGroup.querySelector(".katex") || span;
+    const rect = target.getBoundingClientRect();
+    const scrollW = target.scrollWidth || 0;
+    const scrollH = target.scrollHeight || 0;
+    const width = Math.max(rect.width, scrollW);
+    const height = Math.max(rect.height, scrollH);
+    if (!width || !height) return null;
     const scale = getSvgScale();
     return {
-      w: rect.width / scale.x,
-      h: rect.height / scale.y,
+      w: width / scale.x,
+      h: height / scale.y,
     };
   }
 
@@ -2581,13 +2659,26 @@ export function createRenderer({
     const rawExpr = String(block.params?.expr || "u");
     const latex = exprToLatex(rawExpr);
     const estimateWidth = estimateLatexWidth(latex);
-    const rawEstimate = Math.max(120, Math.ceil(rawExpr.length * 14 + 60));
+    const rawEstimate = USERFUNC_MIN_WIDTH;
     const mathGroup = block.group.querySelector(".userfunc-math");
-    const paddingX = 8;
-    let width = Math.max(estimateWidth, rawEstimate);
-    let height = 80;
-    let measuredWidth = 0;
-    const scale = getSvgScale();
+    const paddingX = 12;
+    const paddingY = 16;
+    // Use a small floor and let rendered KaTeX measurement drive final size.
+    // The LaTeX estimate is only a fallback before render metrics are available.
+    let width = rawEstimate;
+    let height = USERFUNC_MIN_HEIGHT;
+    const measuredTex = measureUserFuncTex(`\\scriptsize{${latex}}`);
+    const hasMeasuredTex = Boolean(measuredTex && Number.isFinite(measuredTex.w) && Number.isFinite(measuredTex.h));
+    if (!hasMeasuredTex) {
+      width = Math.max(width, estimateWidth);
+    }
+    if (measuredTex) {
+      const scale = getSvgScale();
+      const scaledW = measuredTex.w / (scale.x || 1);
+      const scaledH = measuredTex.h / (scale.y || 1);
+      width = Math.max(width, Math.ceil(scaledW + paddingX * 2));
+      height = Math.max(height, Math.ceil(scaledH + paddingY * 2));
+    }
     if (mathGroup) {
       for (let pass = 0; pass < 2; pass += 1) {
         const foreign = mathGroup.querySelector("foreignObject");
@@ -2595,16 +2686,52 @@ export function createRenderer({
           foreign.setAttribute("width", width);
           foreign.setAttribute("height", height);
         }
-        const span = mathGroup.querySelector("span");
-        if (span && !span.classList.contains("katex-target")) {
-          const rect = span.getBoundingClientRect();
-          measuredWidth = rect.width / scale.x;
-          const needed = Math.ceil(measuredWidth + paddingX);
-          if (needed <= width && !force) break;
-          width = Math.max(width, needed);
-        }
+        const size = getMathSpanSize(mathGroup);
+        if (!size) continue;
+        const neededW = Math.ceil(size.w + paddingX * 2);
+        const neededH = Math.ceil(size.h + paddingY * 2);
+        const needsResize = neededW > width || neededH > height;
+        if (!needsResize && !force) break;
+        width = Math.max(width, neededW);
+        height = Math.max(height, neededH);
       }
     }
+    if (DEBUG_WIRE_CHECKS || window.vibesimDebugUserFunc) {
+      const scale = getSvgScale();
+      const mathGroupEl = mathGroup || block.group.querySelector(".userfunc-math");
+      const foreign = mathGroupEl?.querySelector?.("foreignObject") || null;
+      const span = mathGroupEl?.querySelector?.("span") || null;
+      const katexEl = mathGroupEl?.querySelector?.(".katex") || null;
+      const rect = katexEl?.getBoundingClientRect?.() || span?.getBoundingClientRect?.();
+      const rectW = rect?.width ? Math.round(rect.width) : 0;
+      const rectH = rect?.height ? Math.round(rect.height) : 0;
+      const scrollW = katexEl?.scrollWidth || span?.scrollWidth || 0;
+      const scrollH = katexEl?.scrollHeight || span?.scrollHeight || 0;
+      const foreignW = Number(foreign?.getAttribute?.("width") || 0);
+      const foreignH = Number(foreign?.getAttribute?.("height") || 0);
+      const viewBox = svg.getAttribute("viewBox") || "";
+      setUserFuncSizingDebug(block, {
+        scale: `${scale.x.toFixed(3)}x${scale.y.toFixed(3)}`,
+        viewBox,
+        blockSize: `${Math.round(block.width)}x${Math.round(block.height)}`,
+        targetSize: `${Math.round(width)}x${Math.round(height)}`,
+        padding: `${paddingX},${paddingY}`,
+        estimateWidth,
+        rawEstimate,
+        hasMeasuredTex,
+        measureTexPx: measuredTex ? `${Math.round(measuredTex.w)}x${Math.round(measuredTex.h)}` : "none",
+        foreign: `${Math.round(foreignW)}x${Math.round(foreignH)}`,
+        rect: `${rectW}x${rectH}`,
+        scroll: `${Math.round(scrollW)}x${Math.round(scrollH)}`,
+        devicePixelRatio: typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1,
+      });
+    }
+    applyUserFuncSize(block, width, height, { force });
+    scheduleUserFuncFit(block);
+  }
+
+  function applyUserFuncSize(block, width, height, { force = false } = {}) {
+    if (!block) return;
     if (!force && width === block.width && height === block.height) return;
     block.width = width;
     block.height = height;
@@ -2613,6 +2740,7 @@ export function createRenderer({
       body.setAttribute("width", width);
       body.setAttribute("height", height);
     }
+    const mathGroup = block.group.querySelector(".userfunc-math");
     if (mathGroup) {
       const foreign = mathGroup.querySelector("foreignObject");
       if (foreign) {
@@ -2661,6 +2789,37 @@ export function createRenderer({
     updateBlockTransform(block);
     state.routingDirty = true;
     updateConnections(true);
+  }
+
+  function scheduleUserFuncFit(block) {
+    if (!block || block.type !== "userFunc") return;
+    const id = block.id;
+    const attempts = userFuncResizeAttempts.get(id) || 0;
+    if (attempts >= 4) {
+      userFuncResizeAttempts.delete(id);
+      return;
+    }
+    userFuncResizeAttempts.set(id, attempts + 1);
+    setTimeout(() => {
+      const mathGroup = block.group?.querySelector?.(".userfunc-math");
+      const size = getMathSpanSize(mathGroup);
+      if (!size) return;
+      const paddingX = 12;
+      const paddingY = 16;
+      const neededW = Math.ceil(size.w + paddingX * 2);
+      const neededH = Math.ceil(size.h + paddingY * 2);
+      if (neededW > block.width || neededH > block.height) {
+        applyUserFuncSize(
+          block,
+          Math.max(block.width, neededW),
+          Math.max(block.height, neededH),
+          { force: true }
+        );
+        scheduleUserFuncFit(block);
+      } else {
+        userFuncResizeAttempts.delete(id);
+      }
+    }, 60);
   }
 
   if (typeof window !== "undefined") {
@@ -3116,6 +3275,7 @@ export function createRenderer({
         updateConnections(true);
       }
     }
+
     if (block.type === "constant") {
       const mathGroup = block.group.querySelector(".constant-math");
       if (mathGroup) {

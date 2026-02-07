@@ -7,6 +7,7 @@ import { diagramToFRD } from "./control/diagram.js";
 import { blockLibrary } from "./blocks/index.js";
 import { createInspector } from "./blocks/inspector.js";
 import { evalExpression, exprToLatex } from "./utils/expr.js";
+import { GRID_SIZE } from "./geometry.js";
 
 const svg = document.getElementById("svgCanvas");
 const blockLayer = document.getElementById("blockLayer");
@@ -39,22 +40,28 @@ const debugPanel = document.getElementById("debugPanel");
 const debugLog = document.getElementById("debugLog");
 const blockLibraryGroups = document.getElementById("blockLibraryGroups");
 
-const DEBUG_UI = true;
+const DEBUG_UI = false;
 
 if (debugPanel) debugPanel.hidden = !DEBUG_UI;
+if (typeof window !== "undefined") window.vibesimDebugUserFunc = DEBUG_UI;
 
 const updateUserFuncDebug = () => {
   const selected = state.selectedId ? state.blocks.get(state.selectedId) : null;
   if (selected?.type === "userFunc") {
     const expr = String(selected.params?.expr || "u");
     const latex = exprToLatex(expr);
-    const text = `[userFunc]\nexpr=${expr}\nlatex=${latex}`;
+    const sizing = window.vibesimUserFuncSizing || "";
+    const text = `[userFunc]\nexpr=${expr}\nlatex=${latex}${sizing ? `\n\n${sizing}` : ""}`;
     window.vibesimDebugExtra = text;
     if (debugLog) debugLog.textContent = text;
     return;
   }
   window.vibesimDebugExtra = "";
 };
+
+window.addEventListener("userFuncSizingDebug", () => {
+  updateUserFuncDebug();
+});
 
 if (rotateSelectionBtn) rotateSelectionBtn.disabled = true;
 
@@ -1485,16 +1492,54 @@ function init() {
   };
 
   deleteSelectionBtn.addEventListener("click", handleDeleteSelection);
+  const moveSelectedBlocks = (dx, dy) => {
+    const selectedIds = state.selectedIds && state.selectedIds.size > 0 ? state.selectedIds : null;
+    const ids = selectedIds && selectedIds.has(state.selectedId)
+      ? Array.from(selectedIds)
+      : state.selectedId
+        ? [state.selectedId]
+        : [];
+    if (!ids.length) return false;
+    ids.forEach((id) => {
+      const block = state.blocks.get(id);
+      if (!block) return;
+      block.x = Math.max(0, block.x + dx);
+      block.y = Math.max(0, block.y + dy);
+      renderer.updateBlockTransform(block);
+    });
+    if (state.dirtyBlocks) ids.forEach((id) => state.dirtyBlocks.add(id));
+    state.fastRouting = false;
+    state.routingDirty = true;
+    renderer.updateConnections(true);
+    renderer.updateSelectionBox();
+    signalDiagramChanged();
+    return true;
+  };
+
   window.addEventListener("keydown", (event) => {
-    if (event.key !== "Delete") return;
     const target = event.target;
     const isEditable =
       target &&
       (target.isContentEditable ||
         ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
     if (isEditable) return;
-    handleDeleteSelection();
-    event.preventDefault();
+
+    if (event.key === "Delete") {
+      handleDeleteSelection();
+      event.preventDefault();
+      return;
+    }
+
+    let dx = 0;
+    let dy = 0;
+    if (event.key === "ArrowLeft") dx = -GRID_SIZE;
+    if (event.key === "ArrowRight") dx = GRID_SIZE;
+    if (event.key === "ArrowUp") dy = -GRID_SIZE;
+    if (event.key === "ArrowDown") dy = GRID_SIZE;
+    if (!dx && !dy) return;
+    if (moveSelectedBlocks(dx, dy)) {
+      event.preventDefault();
+    }
   });
 
   rotateSelectionBtn.addEventListener("click", () => {
