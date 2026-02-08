@@ -25,8 +25,8 @@ const USERFUNC_PADDING_X = 12;
 const USERFUNC_PADDING_Y = 16;
 const USERFUNC_SETTLE_RETRIES = 4;
 const USERFUNC_SETTLE_DELAY_MS = 60;
-const TF_MIN_WIDTH = 160;
-const DTF_MIN_WIDTH = 140;
+const TF_MIN_WIDTH = 80;
+const DTF_MIN_WIDTH = 80;
 
 function createSvgElement(tag, attrs = {}, text = "") {
   const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
