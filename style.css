@@ -1051,10 +1051,21 @@ body.is-root-diagram #subsystemUpBtn {
 
 .subsystem-port-label {
   fill: #6d727a;
-  font-size: 10px;
-  dominant-baseline: middle;
 }
 
+.subsystem-port-label .math-foreign,
+.subsystem-port-label .math-foreign mjx-container {
+  font-size: 12.8px;
+  color: #6d727a;
+}
+
+.subsystem-port-label--left .math-foreign {
+  justify-content: flex-start;
+}
+
+.subsystem-port-label--right .math-foreign {
+  justify-content: flex-end;
+}
 
 .sum-sign {
   fill: #3c3c3c;

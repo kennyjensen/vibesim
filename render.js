@@ -2,6 +2,7 @@ import { snap, distancePointToSegment, GRID_SIZE, segmentLengthStats } from "./g
 import { routeAllConnections, routeDirtyConnections } from "./router.js";
 import { renderScope } from "./sim.js";
 import { buildBlockTemplates } from "./blocks/index.js";
+import { computeSubsystemPortLabelFrame } from "./blocks/utility.js";
 import { exprToLatex, estimateLatexWidth } from "./utils/expr.js";
 import {
   rotatePoint,
@@ -411,7 +412,15 @@ function formatLabelTeX(label) {
   if (!text) return "";
   // Special-case: labels starting with 2+ letters are treated as text-like names.
   if (/^[A-Za-z]{2,}/.test(text)) {
-    return `\\mathrm{${text}}`;
+    const match = text.match(/^([A-Za-z][A-Za-z0-9]*)(.*)$/);
+    if (!match) return `\\mathsf{${text}}`;
+    const base = match[1];
+    const rest = match[2] || "";
+    // Keep sub/superscripts in math mode so things like OUT_2 render correctly.
+    if (rest.startsWith("_") || rest.startsWith("^")) {
+      return `\\mathsf{${base}}${rest}`;
+    }
+    return `\\mathsf{${text}}`;
   }
   // Otherwise interpret the label directly as LaTeX.
   return text;
@@ -816,6 +825,7 @@ const blockTemplates = buildBlockTemplates({
   svgText,
   createSvgElement,
   renderTeXMath,
+  formatLabelTeX,
   renderSourcePlot,
   renderCenteredAxesPlot,
   buildTransferTeX,
@@ -874,7 +884,7 @@ export function createRenderer({
   const debugLog = document.getElementById("debugLog");
   const copyDebugButton = document.getElementById("copyDebug");
   if (debugLog && copyDebugButton) {
-    copyDebugButton.style.display = DEBUG_WIRE_CHECKS ? "inline-flex" : "none";
+    copyDebugButton.style.display = "inline-flex";
   }
   if (debugLog && copyDebugButton) {
     copyDebugButton.addEventListener("click", async () => {
@@ -3446,6 +3456,24 @@ export function createRenderer({
       const previous = { width: block.width, height: block.height };
       template.resize(block);
       const sizeChanged = previous.width !== block.width || previous.height !== block.height;
+      const desiredInputSpecs = Array.isArray(block.dynamicInputs) ? block.dynamicInputs : template.inputs;
+      const desiredOutputSpecs = Array.isArray(block.dynamicOutputs) ? block.dynamicOutputs : template.outputs;
+      const currentInputs = block.ports.filter((port) => port.type === "in").sort((a, b) => a.index - b.index);
+      const currentOutputs = block.ports.filter((port) => port.type === "out").sort((a, b) => a.index - b.index);
+      const inputsChanged =
+        currentInputs.length !== desiredInputSpecs.length ||
+        currentInputs.some((port, index) => {
+          const spec = desiredInputSpecs[index];
+          return !spec || port.x !== spec.x || port.y !== spec.y || port.side !== spec.side;
+        });
+      const outputsChanged =
+        currentOutputs.length !== desiredOutputSpecs.length ||
+        currentOutputs.some((port, index) => {
+          const spec = desiredOutputSpecs[index];
+          return !spec || port.x !== spec.x || port.y !== spec.y || port.side !== spec.side;
+        });
+      const needsPortRebuild = inputsChanged || outputsChanged;
+
       if (sizeChanged) {
         const rect = block.group.querySelector("rect.block-body");
         if (rect) {
@@ -3464,33 +3492,62 @@ export function createRenderer({
           block.dragRect.setAttribute("width", dragWidth);
           block.dragRect.setAttribute("height", dragBoxHeight);
         }
-        const inputPorts = block.ports.filter((port) => port.type === "in").sort((a, b) => a.index - b.index);
-        const outputPorts = block.ports.filter((port) => port.type === "out").sort((a, b) => a.index - b.index);
-        const dynamicInputs = Array.isArray(block.dynamicInputs) ? block.dynamicInputs : null;
-        const dynamicOutputs = Array.isArray(block.dynamicOutputs) ? block.dynamicOutputs : null;
-        inputPorts.forEach((port, index) => {
-          const spec = dynamicInputs ? dynamicInputs[index] : null;
-          if (spec) {
-            port.x = spec.x;
-            port.y = spec.y;
-            port.side = spec.side;
-          }
-          port.wireX = port.x;
-          port.wireY = port.y;
-          updatePortElement(port);
-        });
-        outputPorts.forEach((port, index) => {
-          const spec = dynamicOutputs ? dynamicOutputs[index] : null;
-          if (spec) {
-            port.x = spec.x;
-            port.y = spec.y;
-            port.side = spec.side;
-          }
-          port.wireX = port.x;
-          port.wireY = port.y;
-          updatePortElement(port);
-        });
         updateBlockTransform(block);
+      }
+
+      if (needsPortRebuild) {
+        block.ports.forEach((port) => {
+          if (port?.el?.parentNode) port.el.parentNode.removeChild(port.el);
+        });
+        block.ports = [];
+        desiredInputSpecs.forEach((spec, index) => {
+          const circle = createPortCircle(block.id, "in", index, spec, block.type);
+          block.group.appendChild(circle);
+          block.ports.push({
+            ...spec,
+            type: "in",
+            index,
+            el: circle,
+            wireX: spec.wireX ?? spec.x,
+            wireY: spec.wireY ?? spec.y,
+          });
+        });
+        desiredOutputSpecs.forEach((spec, index) => {
+          const circle = createPortCircle(block.id, "out", index, spec, block.type);
+          block.group.appendChild(circle);
+          block.ports.push({
+            ...spec,
+            type: "out",
+            index,
+            el: circle,
+            wireX: spec.wireX ?? spec.x,
+            wireY: spec.wireY ?? spec.y,
+          });
+        });
+      } else if (sizeChanged) {
+        currentInputs.forEach((port, index) => {
+          const spec = desiredInputSpecs[index];
+          if (!spec) return;
+          port.x = spec.x;
+          port.y = spec.y;
+          port.side = spec.side;
+          port.wireX = spec.wireX ?? spec.x;
+          port.wireY = spec.wireY ?? spec.y;
+          updatePortElement(port);
+        });
+        currentOutputs.forEach((port, index) => {
+          const spec = desiredOutputSpecs[index];
+          if (!spec) return;
+          port.x = spec.x;
+          port.y = spec.y;
+          port.side = spec.side;
+          port.wireX = spec.wireX ?? spec.x;
+          port.wireY = spec.wireY ?? spec.y;
+          updatePortElement(port);
+        });
+      }
+
+      if (sizeChanged || needsPortRebuild) {
         state.routingDirty = true;
         updateConnections(true);
       }
@@ -3606,7 +3663,7 @@ export function createRenderer({
           mathGroup.classList.add("switch-math--l");
         }
         mathGroup.setAttribute("transform", "translate(0 17)");
-        renderTeXMath(mathGroup, `${op}\\!${threshold}`, 48, 34);
+        renderTeXMath(mathGroup, `${op}\\!\\!${threshold}`, 48, 34);
       }
     }
     if (block.type === "zoh") {
@@ -3689,7 +3746,11 @@ export function createRenderer({
     }
     if (block.type === "subsystem") {
       const title = block.group.querySelector(".block-text");
-      if (title) title.textContent = String(block.params?.name || "Subsystem");
+      if (title) {
+        title.textContent = String(block.params?.name || "Subsystem");
+        title.setAttribute("x", String(block.width / 2));
+        title.setAttribute("y", String(block.height / 2));
+      }
       const labelLayer = block.group.querySelector(".subsystem-port-labels");
       if (labelLayer) {
         while (labelLayer.firstChild) labelLayer.removeChild(labelLayer.firstChild);
@@ -3701,36 +3762,54 @@ export function createRenderer({
         const outputPorts = block.ports
           .filter((p) => p.type === "out")
           .sort((a, b) => a.index - b.index);
+        const labelScale = 0.8;
+        const debugLines = [];
         inputPorts.forEach((port, idx) => {
           const name = String(inNames[idx]?.name || `in${idx + 1}`);
-          labelLayer.appendChild(
-            createSvgElement(
-              "text",
-              {
-                x: 7,
-                y: port.y + 3,
-                class: "subsystem-port-label",
-                "text-anchor": "start",
-              },
-              name
-            )
+          const tex = formatLabelTeX(name);
+          const frame = computeSubsystemPortLabelFrame({
+            blockWidth: block.width,
+            blockHeight: block.height,
+            portY: port.y,
+            side: "left",
+          });
+          const mathGroup = createSvgElement("g", {
+            class: "label-math subsystem-port-label subsystem-port-label--left",
+            transform: `translate(${frame.x},${frame.y})`,
+          });
+          mathGroup.dataset.scale = String(labelScale);
+          labelLayer.appendChild(mathGroup);
+          renderTeXMath(mathGroup, tex, frame.width, frame.height);
+          debugLines.push(
+            `in${idx + 1}: raw="${name}" tex="${tex}" box=[x:${frame.x}, y:${frame.y}, w:${frame.width}, h:${frame.height}, scale:${labelScale}]`
           );
         });
         outputPorts.forEach((port, idx) => {
           const name = String(outNames[idx]?.name || `out${idx + 1}`);
-          labelLayer.appendChild(
-            createSvgElement(
-              "text",
-              {
-                x: block.width - 7,
-                y: port.y + 3,
-                class: "subsystem-port-label",
-                "text-anchor": "end",
-              },
-              name
-            )
+          const tex = formatLabelTeX(name);
+          const frame = computeSubsystemPortLabelFrame({
+            blockWidth: block.width,
+            blockHeight: block.height,
+            portY: port.y,
+            side: "right",
+          });
+          const mathGroup = createSvgElement("g", {
+            class: "label-math subsystem-port-label subsystem-port-label--right",
+            transform: `translate(${frame.x},${frame.y})`,
+          });
+          mathGroup.dataset.scale = String(labelScale);
+          labelLayer.appendChild(mathGroup);
+          renderTeXMath(mathGroup, tex, frame.width, frame.height);
+          debugLines.push(
+            `out${idx + 1}: raw="${name}" tex="${tex}" box=[x:${frame.x}, y:${frame.y}, w:${frame.width}, h:${frame.height}, scale:${labelScale}]`
           );
         });
+        if (debugLog) {
+          debugLog.textContent = [
+            `[subsystem-label-debug] block=${block.id} name="${String(block.params?.name || "Subsystem")}"`,
+            ...debugLines,
+          ].join("\n");
+        }
       }
     }
 

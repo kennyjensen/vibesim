@@ -41,7 +41,7 @@ const debugPanel = document.getElementById("debugPanel");
 const debugLog = document.getElementById("debugLog");
 const blockLibraryGroups = document.getElementById("blockLibraryGroups");
 
-const DEBUG_UI = false;
+const DEBUG_UI = true;
 
 if (debugPanel) debugPanel.hidden = !DEBUG_UI;
 

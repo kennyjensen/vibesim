@@ -6,13 +6,30 @@ export const utilityLibrary = {
   ],
 };
 
+export const SUBSYSTEM_PORT_LABEL_EDGE_PAD = 6;
+export const computeSubsystemPortLabelFrame = ({ blockWidth, blockHeight, portY, side }) => {
+  const width = Math.max(48, Math.floor(blockWidth * 0.36));
+  const height = blockHeight;
+  const x =
+    side === "right"
+      ? blockWidth - width - SUBSYSTEM_PORT_LABEL_EDGE_PAD
+      : SUBSYSTEM_PORT_LABEL_EDGE_PAD;
+  const y = Math.round(portY - height / 2);
+  return { x, y, width, height };
+};
+
 const conditionToLatex = (condition, threshold) => {
   const op = condition === "gt" ? ">" : condition === "ne" ? "\\ne" : "\\geq";
-  return `${op}\\!${threshold}`;
+  return `${op}\\!\\!${threshold}`;
 };
 
 export const createUtilityTemplates = (helpers) => {
-  const { createSvgElement, renderTeXMath, GRID_SIZE } = helpers;
+  const { createSvgElement, renderTeXMath, GRID_SIZE, formatLabelTeX } = helpers;
+  const formatPortLabelTeX = (label) => {
+    const text = String(label || "").trim();
+    if (!text) return "";
+    return typeof formatLabelTeX === "function" ? formatLabelTeX(text) : text;
+  };
   const estimateLabelWidth = (text, charWidth = 7.5, padding = 16) => {
     const len = Math.max(String(text || "").length, 1);
     return Math.ceil(len * charWidth + padding);
@@ -125,35 +142,38 @@ export const createUtilityTemplates = (helpers) => {
         const inYs = Array.isArray(block.dynamicInputs) ? block.dynamicInputs.map((p) => p.y) : [block.height / 2];
         const outYs = Array.isArray(block.dynamicOutputs) ? block.dynamicOutputs.map((p) => p.y) : [block.height / 2];
         const portLabelLayer = createSvgElement("g", { class: "subsystem-port-labels" });
+        const labelScale = 0.8;
         inYs.forEach((y, idx) => {
           const name = String(inNames[idx]?.name || `in${idx + 1}`);
-          portLabelLayer.appendChild(
-            createSvgElement(
-              "text",
-              {
-                x: 7,
-                y: y + 3,
-                class: "subsystem-port-label",
-                "text-anchor": "start",
-              },
-              name
-            )
-          );
+          const frame = computeSubsystemPortLabelFrame({
+            blockWidth: block.width,
+            blockHeight: block.height,
+            portY: y,
+            side: "left",
+          });
+          const mathGroup = createSvgElement("g", {
+            class: "label-math subsystem-port-label subsystem-port-label--left",
+            transform: `translate(${frame.x},${frame.y})`,
+          });
+          mathGroup.dataset.scale = String(labelScale);
+          portLabelLayer.appendChild(mathGroup);
+          renderTeXMath(mathGroup, formatPortLabelTeX(name), frame.width, frame.height);
         });
         outYs.forEach((y, idx) => {
           const name = String(outNames[idx]?.name || `out${idx + 1}`);
-          portLabelLayer.appendChild(
-            createSvgElement(
-              "text",
-              {
-                x: block.width - 7,
-                y: y + 3,
-                class: "subsystem-port-label",
-                "text-anchor": "end",
-              },
-              name
-            )
-          );
+          const frame = computeSubsystemPortLabelFrame({
+            blockWidth: block.width,
+            blockHeight: block.height,
+            portY: y,
+            side: "right",
+          });
+          const mathGroup = createSvgElement("g", {
+            class: "label-math subsystem-port-label subsystem-port-label--right",
+            transform: `translate(${frame.x},${frame.y})`,
+          });
+          mathGroup.dataset.scale = String(labelScale);
+          portLabelLayer.appendChild(mathGroup);
+          renderTeXMath(mathGroup, formatPortLabelTeX(name), frame.width, frame.height);
         });
         group.appendChild(portLabelLayer);
         const name = String(block.params?.name || "Subsystem");
