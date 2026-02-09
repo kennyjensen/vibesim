@@ -845,6 +845,102 @@ export function createRenderer({
   onOpenSubsystem,
 }) {
   let routeAfterPreviewScheduled = false;
+  let fullRouteWorker = null;
+  let fullRouteSeq = 0;
+  let latestFullRouteApplied = 0;
+
+  const buildRoutingSnapshot = () => ({
+    blocks: Array.from(state.blocks.values()).map((block) => ({
+      id: block.id,
+      x: Number(block.x) || 0,
+      y: Number(block.y) || 0,
+      width: Number(block.width) || 0,
+      height: Number(block.height) || 0,
+      rotation: Number(block.rotation) || 0,
+      ports: (block.ports || []).map((port) => ({
+        x: Number(port.x) || 0,
+        y: Number(port.y) || 0,
+        type: port.type,
+        index: Number(port.index) || 0,
+      })),
+    })),
+    connections: state.connections.map((conn) => ({
+      from: conn.from,
+      to: conn.to,
+      fromIndex: Number(conn.fromIndex ?? 0),
+      toIndex: Number(conn.toIndex ?? 0),
+    })),
+  });
+
+  const ensureFullRouteWorker = () => {
+    if (fullRouteWorker) return fullRouteWorker;
+    if (typeof Worker === "undefined") return null;
+    try {
+      fullRouteWorker = new Worker(new URL("./workers/route-worker.js", import.meta.url), { type: "module" });
+    } catch (_error) {
+      fullRouteWorker = null;
+    }
+    return fullRouteWorker;
+  };
+
+  const applyWorkerFullRoute = (routes) => {
+    const routeList = Array.isArray(routes) ? routes : [];
+    state.connections.forEach((conn, idx) => {
+      const points = routeList[idx];
+      if (!Array.isArray(points) || points.length < 2) return;
+      conn.points = points;
+    });
+    applyWirePaths(new Map());
+    state.routingDirty = false;
+    if (state.dirtyBlocks) state.dirtyBlocks.clear();
+    if (state.dirtyConnections) state.dirtyConnections.clear();
+    updateSelectionBox();
+    refreshDebugLog();
+    updateWireCornerHandles();
+  };
+
+  const routeAllInWorker = (timeLimitMs) =>
+    new Promise((resolve, reject) => {
+      const worker = ensureFullRouteWorker();
+      if (!worker) {
+        reject(new Error("worker_unavailable"));
+        return;
+      }
+      const jobId = ++fullRouteSeq;
+      const snapshot = buildRoutingSnapshot();
+      const worldW = Number(svg.dataset.worldWidth) || svg.clientWidth || 1;
+      const worldH = Number(svg.dataset.worldHeight) || svg.clientHeight || 1;
+      const onMessage = (event) => {
+        const data = event?.data || {};
+        if (data.jobId !== jobId) return;
+        worker.removeEventListener("message", onMessage);
+        worker.removeEventListener("error", onError);
+        if (!data.ok) {
+          reject(new Error(data.error || "route_worker_failed"));
+          return;
+        }
+        if (jobId < latestFullRouteApplied) {
+          resolve({ stale: true });
+          return;
+        }
+        latestFullRouteApplied = jobId;
+        resolve({ stale: false, routes: data.routes });
+      };
+      const onError = (event) => {
+        worker.removeEventListener("message", onMessage);
+        worker.removeEventListener("error", onError);
+        reject(new Error(event?.message || "route_worker_error"));
+      };
+      worker.addEventListener("message", onMessage);
+      worker.addEventListener("error", onError);
+      worker.postMessage({
+        jobId,
+        snapshot,
+        width: worldW,
+        height: worldH,
+        timeLimitMs,
+      });
+    });
 
   const queueRouteAfterPreview = () => {
     if (routeAfterPreviewScheduled) return;
@@ -1963,17 +2059,25 @@ export function createRenderer({
     });
   }
 
-  function forceFullRoute(timeLimitMs = FORCE_FULL_ROUTE_TIME_LIMIT_MS) {
-    const worldW = Number(svg.dataset.worldWidth) || svg.clientWidth || 1;
-    const worldH = Number(svg.dataset.worldHeight) || svg.clientHeight || 1;
-    const paths = routeAllConnections(state, worldW, worldH, { x: 0, y: 0 }, timeLimitMs, false);
-    applyWirePaths(paths);
-    state.routingDirty = false;
-    if (state.dirtyBlocks) state.dirtyBlocks.clear();
-    if (state.dirtyConnections) state.dirtyConnections.clear();
-    updateSelectionBox();
-    refreshDebugLog();
-    updateWireCornerHandles();
+  async function forceFullRoute(timeLimitMs = FORCE_FULL_ROUTE_TIME_LIMIT_MS) {
+    try {
+      const result = await routeAllInWorker(timeLimitMs);
+      if (!result?.stale && result?.routes) {
+        applyWorkerFullRoute(result.routes);
+      }
+      return;
+    } catch (_error) {
+      const worldW = Number(svg.dataset.worldWidth) || svg.clientWidth || 1;
+      const worldH = Number(svg.dataset.worldHeight) || svg.clientHeight || 1;
+      const paths = routeAllConnections(state, worldW, worldH, { x: 0, y: 0 }, timeLimitMs, false);
+      applyWirePaths(paths);
+      state.routingDirty = false;
+      if (state.dirtyBlocks) state.dirtyBlocks.clear();
+      if (state.dirtyConnections) state.dirtyConnections.clear();
+      updateSelectionBox();
+      refreshDebugLog();
+      updateWireCornerHandles();
+    }
   }
 
   function applyWirePaths(paths) {
