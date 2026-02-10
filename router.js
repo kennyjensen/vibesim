@@ -1374,6 +1374,10 @@ function normalizeSharedSourceJunctions(connections) {
       turnInfos.forEach(({ conn, info }) => {
         if (info.turn.x === targetX) return;
         if (!canAdjustSharedTurn(conn.points, info, "x", targetX, preferredStubCells)) return;
+        const proposed = conn.points.map((pt) => ({ x: pt.x, y: pt.y }));
+        proposed[info.turnIndex].x = targetX;
+        proposed[info.turnIndex + 1].x = targetX;
+        if (wouldCreateNonSharedOverlap(conn, proposed, connections)) return;
         // Keep path shape; only move the first bend column.
         conn.points[info.turnIndex].x = targetX;
         conn.points[info.turnIndex + 1].x = targetX;
@@ -1389,11 +1393,35 @@ function normalizeSharedSourceJunctions(connections) {
       turnInfos.forEach(({ conn, info }) => {
         if (info.turn.y === targetY) return;
         if (!canAdjustSharedTurn(conn.points, info, "y", targetY, preferredStubCells)) return;
+        const proposed = conn.points.map((pt) => ({ x: pt.x, y: pt.y }));
+        proposed[info.turnIndex].y = targetY;
+        proposed[info.turnIndex + 1].y = targetY;
+        if (wouldCreateNonSharedOverlap(conn, proposed, connections)) return;
         conn.points[info.turnIndex].y = targetY;
         conn.points[info.turnIndex + 1].y = targetY;
       });
     }
   });
+}
+
+function wouldCreateNonSharedOverlap(conn, proposedPoints, connections) {
+  const proposedSegs = buildOrthoSegments(proposedPoints);
+  if (!proposedSegs.length) return false;
+  const fromIndex = conn.fromIndex ?? 0;
+  const toIndex = conn.toIndex ?? 0;
+  for (let i = 0; i < connections.length; i += 1) {
+    const other = connections[i];
+    if (!other || other === conn) continue;
+    const otherFromIndex = other.fromIndex ?? 0;
+    const otherToIndex = other.toIndex ?? 0;
+    const sharedFrom = other.from === conn.from && otherFromIndex === fromIndex;
+    const sharedTo = other.to === conn.to && otherToIndex === toIndex;
+    if (sharedFrom || sharedTo) continue;
+    const otherSegs = buildOrthoSegments(other.points || []);
+    if (!otherSegs.length) continue;
+    if (countParallelOverlaps(proposedSegs, otherSegs) > 0) return true;
+  }
+  return false;
 }
 
 function canAdjustSharedTurn(points, info, axis, targetValue, preferredStubCells = 2) {
@@ -1547,52 +1575,7 @@ function dedupePoints(points) {
 
 function simplifyOrthogonalPath(points) {
   if (!points || points.length < 3) return points;
-  let result = removeColinearPoints(dedupePoints(points));
-  let changed = true;
-  while (changed && result.length >= 4) {
-    changed = false;
-    for (let i = 0; i < result.length - 1; i += 1) {
-      const a = result[i];
-      const b = result[i + 1];
-      for (let j = 0; j < i - 1; j += 1) {
-        const c = result[j];
-        const d = result[j + 1];
-        const hit = orthogonalIntersection(a, b, c, d);
-        if (!hit) continue;
-        const head = result.slice(0, j + 1);
-        if (!samePoint(head[head.length - 1], hit)) {
-          head.push(hit);
-        }
-        let tail = result.slice(i + 1);
-        if (tail.length && samePoint(tail[0], head[head.length - 1])) {
-          tail = tail.slice(1);
-        }
-        result = removeColinearPoints(dedupePoints([...head, ...tail]));
-        changed = true;
-        break;
-      }
-      if (changed) break;
-    }
-  }
-  return result;
-}
-
-function orthogonalIntersection(a, b, c, d) {
-  const aH = a.y === b.y;
-  const bH = c.y === d.y;
-  if (aH === bH) return null;
-  const h = aH ? { a, b } : { a: c, b: d };
-  const v = aH ? { a: c, b: d } : { a, b };
-  const hx1 = Math.min(h.a.x, h.b.x);
-  const hx2 = Math.max(h.a.x, h.b.x);
-  const vy1 = Math.min(v.a.y, v.b.y);
-  const vy2 = Math.max(v.a.y, v.b.y);
-  const ix = v.a.x;
-  const iy = h.a.y;
-  if (ix > hx1 && ix < hx2 && iy > vy1 && iy < vy2) {
-    return { x: ix, y: iy };
-  }
-  return null;
+  return removeColinearPoints(dedupePoints(points));
 }
 
 function removeColinearPoints(points) {
@@ -1609,11 +1592,6 @@ function removeColinearPoints(points) {
   }
   result.push(points[points.length - 1]);
   return result;
-}
-
-function samePoint(a, b) {
-  if (!a || !b) return false;
-  return a.x === b.x && a.y === b.y;
 }
 
 function pointsToPath(points) {
