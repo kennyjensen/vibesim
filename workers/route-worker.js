@@ -1,5 +1,5 @@
 import { GRID_SIZE, snap } from "../geometry.js";
-import { routeConnections2 } from "../router.js";
+import { routeAllConnections } from "../router.js";
 
 function rotatePoint(point, block) {
   const angle = ((block.rotation || 0) % 360 + 360) % 360;
@@ -110,33 +110,52 @@ function buildRouteInput(snapshot) {
   return { nodes, connections, obstacles };
 }
 
-self.onmessage = (event) => {
-  const { jobId, snapshot, width, height, timeLimitMs } = event.data || {};
-  try {
-    const { nodes, connections, obstacles } = buildRouteInput(snapshot || {});
-    const settings = {
-      maxTimeMs: Number.isFinite(timeLimitMs) ? timeLimitMs : 4000,
-      incremental: false,
-      fullOptimize: true,
-      searchPadding: Math.max(20, Math.ceil(Math.max(Number(width) || 1, Number(height) || 1) / GRID_SIZE) + 5),
-      nearObstaclePenalty1: 10,
-      nearObstaclePenalty2: 4,
-      nearWirePenalty1: 6,
-      nearWirePenalty2: 2,
-    };
-    const result = routeConnections2({ nodes, connections, obstacles, settings });
-    const routes = new Array(connections.length).fill(null);
-    connections.forEach((conn) => {
-      const wire = result.wires.get(conn.key);
-      if (!wire || !Array.isArray(wire.points) || wire.points.length < 2) return;
-      routes[conn.idx] = wire.points.map((pt) => ({
-        x: pt.x * GRID_SIZE,
-        y: pt.y * GRID_SIZE,
-      }));
+export function routeSnapshot(snapshot, width, height, timeLimitMs) {
+  const blocksArr = Array.isArray(snapshot?.blocks) ? snapshot.blocks : [];
+  const connsArr = Array.isArray(snapshot?.connections) ? snapshot.connections : [];
+  const blocks = new Map();
+  blocksArr.forEach((block) => {
+    if (!block || !block.id) return;
+    blocks.set(block.id, {
+      id: block.id,
+      x: Number(block.x) || 0,
+      y: Number(block.y) || 0,
+      width: Number(block.width) || 0,
+      height: Number(block.height) || 0,
+      rotation: Number(block.rotation) || 0,
+      ports: Array.isArray(block.ports) ? block.ports : [],
     });
-    self.postMessage({ jobId, ok: true, routes });
-  } catch (error) {
-    self.postMessage({ jobId, ok: false, error: String(error?.message || error) });
-  }
-};
+  });
+  const connections = [];
+  connsArr.forEach((conn) => {
+    if (!conn || !blocks.has(conn.from) || !blocks.has(conn.to)) return;
+    connections.push({
+      from: conn.from,
+      to: conn.to,
+      fromIndex: Number(conn.fromIndex ?? 0),
+      toIndex: Number(conn.toIndex ?? 0),
+      points: [],
+    });
+  });
+  const state = { blocks, connections, dirtyConnections: new Set(), dirtyBlocks: new Set(), routingDirty: false };
+  routeAllConnections(
+    state,
+    Number(width) || 1,
+    Number(height) || 1,
+    { x: 0, y: 0 },
+    Number.isFinite(timeLimitMs) ? timeLimitMs : 4000
+  );
+  return state.connections.map((conn) => (Array.isArray(conn.points) && conn.points.length >= 2 ? conn.points : null));
+}
 
+if (typeof self !== "undefined") {
+  self.onmessage = (event) => {
+    const { jobId, snapshot, width, height, timeLimitMs } = event.data || {};
+    try {
+      const routes = routeSnapshot(snapshot || {}, width, height, timeLimitMs);
+      self.postMessage({ jobId, ok: true, routes });
+    } catch (error) {
+      self.postMessage({ jobId, ok: false, error: String(error?.message || error) });
+    }
+  };
+}

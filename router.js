@@ -19,6 +19,9 @@ export function routeConnections2({
     nearWirePenalty2: settings.nearWirePenalty2 ?? 0,
     nearObstaclePenalty1: settings.nearObstaclePenalty1 ?? 0,
     nearObstaclePenalty2: settings.nearObstaclePenalty2 ?? 0,
+    junctionPenalty: settings.junctionPenalty ?? 4,
+    nearPortTurnPenalty: settings.nearPortTurnPenalty ?? 40,
+    preferredPortStubCells: settings.preferredPortStubCells ?? 2,
     incremental: settings.incremental ?? false,
     fullOptimize: settings.fullOptimize ?? true,
     searchPadding: settings.searchPadding ?? 20,
@@ -389,6 +392,12 @@ function expandNeighborsFast(
     }
 
     const turnCost = state.dir !== dir.idx ? opts.turnCost : 0;
+    const portTurnCost =
+      turnCost > 0 ? nearPortTurnPenalty(state, start, end, opts) : 0;
+    const junctionCost =
+      turnCost > 0
+        ? sharedJunctionPenalty(state, state.dir, dir.idx, occupancy, meta, opts)
+        : 0;
     const nearData = proximityPenalty(
       nextPoint,
       obstacleGrid,
@@ -412,12 +421,56 @@ function expandNeighborsFast(
         turnCost,
         hopCost,
         nearBreakdown: nearData.breakdown,
-        nearCost: nearData.cost,
+        nearCost: nearData.cost + junctionCost + portTurnCost,
         lengthIncrement: edgeOccupied ? 0 : 1,
       }),
     });
   });
   return results;
+}
+
+function nearPortTurnPenalty(point, start, end, opts) {
+  const preferred = Math.max(1, Number(opts.preferredPortStubCells) || 2);
+  const penalty = Number(opts.nearPortTurnPenalty) || 0;
+  if (penalty <= 0) return 0;
+  const dStart = Math.abs(point.x - start.x) + Math.abs(point.y - start.y);
+  const dEnd = Math.abs(point.x - end.x) + Math.abs(point.y - end.y);
+  const startDeficit = Math.max(0, preferred - dStart);
+  const endDeficit = Math.max(0, preferred - dEnd);
+  // Strongly prefer a straight "stub" near ports; still allow short stubs when constrained.
+  // Quadratic growth keeps 1-cell turns possible but expensive.
+  const deficit = startDeficit + endDeficit;
+  return deficit > 0 ? penalty * deficit * deficit * 8 : 0;
+}
+
+function sharedJunctionPenalty(statePoint, prevDirIdx, nextDirIdx, occupancy, meta, opts) {
+  if (!meta) return 0;
+  const prevOrient = dirOrientation(prevDirIdx);
+  const nextOrient = dirOrientation(nextDirIdx);
+  if (!prevOrient || !nextOrient || prevOrient === nextOrient) return 0;
+
+  const info = occupancy.points.get(pointKey(statePoint));
+  if (!info) return 0;
+  if (!(info.owners.has(meta.from) || info.owners.has(meta.to))) return 0;
+  const hasPrevEdge =
+    prevOrient === "H"
+      ? info.hOwners?.has(meta.from) || info.hOwners?.has(meta.to)
+      : info.vOwners?.has(meta.from) || info.vOwners?.has(meta.to);
+  const hasNextEdge =
+    nextOrient === "H"
+      ? info.hOwners?.has(meta.from) || info.hOwners?.has(meta.to)
+      : info.vOwners?.has(meta.from) || info.vOwners?.has(meta.to);
+  // Penalize creating a new branch orientation off an existing shared trunk.
+  if (hasPrevEdge && !hasNextEdge) {
+    return opts.junctionPenalty || 0;
+  }
+  return 0;
+}
+
+function dirOrientation(dirIdx) {
+  if (dirIdx === 0 || dirIdx === 1) return "H";
+  if (dirIdx === 2 || dirIdx === 3) return "V";
+  return null;
 }
 
 function buildResultFromArrays(endIdx, cameFrom, statsArrays, minX, minY, gridW) {
@@ -626,18 +679,51 @@ function buildOccupancy(wires) {
 function occupancyAddWire(occupancy, points, meta) {
   const ownerIds = meta ? new Set([meta.from, meta.to]) : new Set();
   const wireIds = meta && meta.key ? new Set([meta.key]) : new Set();
+  const ensurePointInfo = (pt) => {
+    const key = pointKey(pt);
+    const existing = occupancy.points.get(key);
+    if (existing) return existing;
+    const created = {
+      horizontal: false,
+      vertical: false,
+      edgeH: false,
+      edgeV: false,
+      hOwners: new Set(),
+      vOwners: new Set(),
+      occupied: false,
+      owners: new Set(),
+      wireIds: new Set(),
+    };
+    occupancy.points.set(key, created);
+    return created;
+  };
+
+  const markEdgeAtPoint = (info, orientation) => {
+    if (orientation === "V") {
+      info.edgeV = true;
+      ownerIds.forEach((id) => info.vOwners.add(id));
+    } else if (orientation === "H") {
+      info.edgeH = true;
+      ownerIds.forEach((id) => info.hOwners.add(id));
+    }
+  };
+
   for (let i = 0; i < points.length; i += 1) {
-    const key = pointKey(points[i]);
-    const info =
-      occupancy.points.get(key) ??
-      { horizontal: false, vertical: false, occupied: false, owners: new Set(), wireIds: new Set() };
+    const info = ensurePointInfo(points[i]);
     info.occupied = true;
     ownerIds.forEach((id) => info.owners.add(id));
     wireIds.forEach((id) => info.wireIds.add(id));
-    occupancy.points.set(key, info);
     if (i > 0) {
       const prev = points[i - 1];
       const curr = points[i];
+      const prevInfo = ensurePointInfo(prev);
+      const orientation = prev.x === curr.x ? "V" : prev.y === curr.y ? "H" : null;
+      if (orientation) {
+        // Mark segment orientation at both endpoints so corners are treated as
+        // existing junction candidates (turns count as junctions).
+        markEdgeAtPoint(prevInfo, orientation);
+        markEdgeAtPoint(info, orientation);
+      }
       const edgeKey = edgeKeyFor(prev, curr);
       const edgeOwners = occupancy.edges.get(edgeKey) ?? new Set();
       ownerIds.forEach((id) => edgeOwners.add(id));
@@ -852,6 +938,7 @@ export function routeAllConnections(
     settings,
   });
   if (typeof window !== "undefined") {
+    const quality = analyzeResultWireQuality(connections, result.wires);
     window.__routerLast = {
       nodes,
       connections,
@@ -864,6 +951,7 @@ export function routeAllConnections(
         prevWires: 0,
         dirty: connections.length,
         changed: connections.length,
+        quality,
       },
     };
   }
@@ -871,9 +959,10 @@ export function routeAllConnections(
 }
 
 export function routeDirtyConnections(state, width, height, offset = { x: 0, y: 0 }, dirtySet, timeLimitMs) {
-  const { nodes, connections, obstacles, prevSolution } = buildRouter2Input(state, dirtySet);
+  const expandedDirtySet = expandDirtyConnectionSet(state, dirtySet);
+  const { nodes, connections, obstacles, prevSolution } = buildRouter2Input(state, expandedDirtySet);
   const changedConnections = new Set(
-    connections.filter((conn) => dirtySet.has(conn.__ref)).map((conn) => conn.key)
+    connections.filter((conn) => expandedDirtySet.has(conn.__ref)).map((conn) => conn.key)
   );
   const settings = {
     maxTimeMs: timeLimitMs ?? 400,
@@ -894,6 +983,7 @@ export function routeDirtyConnections(state, width, height, offset = { x: 0, y: 
     settings,
   });
   if (typeof window !== "undefined") {
+    const quality = analyzeResultWireQuality(connections, result.wires);
     const prevCount = prevSolution?.wires
       ? prevSolution.wires instanceof Map
         ? prevSolution.wires.size
@@ -911,10 +1001,202 @@ export function routeDirtyConnections(state, width, height, offset = { x: 0, y: 
         prevWires: prevCount,
         dirty: dirtySet?.size ?? 0,
         changed: changedConnections.size,
+        quality,
       },
     };
   }
   return applyRouter2Result(state, connections, result);
+}
+
+export function normalizeConnectionJunctions(connections) {
+  normalizeSharedSourceJunctions(connections);
+}
+
+function expandDirtyConnectionSet(state, dirtySet) {
+  const base = new Set(dirtySet || []);
+  if (!base.size || !Array.isArray(state?.connections)) return base;
+
+  const sourceKeys = new Set();
+  const targetKeys = new Set();
+  base.forEach((conn) => {
+    sourceKeys.add(`${conn.from}:${conn.fromIndex ?? 0}`);
+    targetKeys.add(`${conn.to}:${conn.toIndex ?? 0}`);
+  });
+
+  state.connections.forEach((conn) => {
+    const fromKey = `${conn.from}:${conn.fromIndex ?? 0}`;
+    const toKey = `${conn.to}:${conn.toIndex ?? 0}`;
+    if (sourceKeys.has(fromKey) || targetKeys.has(toKey)) {
+      base.add(conn);
+    }
+  });
+  return base;
+}
+
+export function analyzeConnectionGeometry(connections, options = {}) {
+  const ignoreSharedPorts = options.ignoreSharedPorts !== false;
+  const entries = (connections || [])
+    .map((conn, idx) => ({
+      conn,
+      idx,
+      points: Array.isArray(conn?.points) ? conn.points : [],
+      segments: buildOrthoSegments(Array.isArray(conn?.points) ? conn.points : []),
+    }))
+    .filter((entry) => entry.points.length >= 2 && entry.segments.length > 0);
+
+  const issues = {
+    selfCrosses: [],
+    overlaps: [],
+    nonOrthogonal: [],
+  };
+
+  entries.forEach((entry) => {
+    if (entry.segments.some((seg) => seg.orientation === "N")) {
+      issues.nonOrthogonal.push(entry.idx);
+    }
+    const selfCrosses = countSelfCrossings(entry.segments);
+    if (selfCrosses > 0) {
+      issues.selfCrosses.push({ index: entry.idx, count: selfCrosses });
+    }
+  });
+
+  for (let i = 0; i < entries.length; i += 1) {
+    for (let j = i + 1; j < entries.length; j += 1) {
+      const a = entries[i];
+      const b = entries[j];
+      if (ignoreSharedPorts) {
+        const aFromIndex = a.conn.fromIndex ?? 0;
+        const aToIndex = a.conn.toIndex ?? 0;
+        const bFromIndex = b.conn.fromIndex ?? 0;
+        const bToIndex = b.conn.toIndex ?? 0;
+        const sharedFrom = a.conn.from === b.conn.from && aFromIndex === bFromIndex;
+        const sharedTo = a.conn.to === b.conn.to && aToIndex === bToIndex;
+        if (sharedFrom || sharedTo) continue;
+      }
+      const overlapCount = countParallelOverlaps(a.segments, b.segments);
+      if (overlapCount > 0) {
+        issues.overlaps.push({ a: a.idx, b: b.idx, count: overlapCount });
+      }
+    }
+  }
+
+  const totals = {
+    selfCrosses: issues.selfCrosses.reduce((sum, item) => sum + item.count, 0),
+    overlaps: issues.overlaps.reduce((sum, item) => sum + item.count, 0),
+    nonOrthogonal: issues.nonOrthogonal.length,
+  };
+  return { issues, totals };
+}
+
+function analyzeResultWireQuality(connections, wireMap) {
+  const connsWithPoints = (connections || []).map((conn, idx) => {
+    const wire = wireMap?.get?.(conn.key);
+    return {
+      from: conn.from,
+      to: conn.to,
+      fromIndex: conn.fromIndex ?? 0,
+      toIndex: conn.toIndex ?? 0,
+      points: Array.isArray(wire?.points) ? wire.points : [],
+      __idx: idx,
+    };
+  });
+  const analyzed = analyzeConnectionGeometry(connsWithPoints, { ignoreSharedPorts: true });
+  const turns = connsWithPoints.map((conn) => countTurns(conn.points));
+  const length = connsWithPoints.map((conn) => pathLength(conn.points));
+  return {
+    ...analyzed.totals,
+    maxTurns: turns.length ? Math.max(...turns) : 0,
+    avgTurns: turns.length ? turns.reduce((a, b) => a + b, 0) / turns.length : 0,
+    avgLength: length.length ? length.reduce((a, b) => a + b, 0) / length.length : 0,
+  };
+}
+
+function buildOrthoSegments(points) {
+  const segments = [];
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const a = points[i];
+    const b = points[i + 1];
+    if (!a || !b) continue;
+    if (a.x === b.x && a.y === b.y) continue;
+    const orientation = a.x === b.x ? "V" : a.y === b.y ? "H" : "N";
+    segments.push({
+      a,
+      b,
+      orientation,
+      minX: Math.min(a.x, b.x),
+      maxX: Math.max(a.x, b.x),
+      minY: Math.min(a.y, b.y),
+      maxY: Math.max(a.y, b.y),
+    });
+  }
+  return segments;
+}
+
+function countSelfCrossings(segments) {
+  let count = 0;
+  for (let i = 0; i < segments.length; i += 1) {
+    const s1 = segments[i];
+    if (s1.orientation === "N") continue;
+    for (let j = i + 2; j < segments.length; j += 1) {
+      if (i === 0 && j === segments.length - 1) continue;
+      const s2 = segments[j];
+      if (s2.orientation === "N" || s1.orientation === s2.orientation) continue;
+      const h = s1.orientation === "H" ? s1 : s2;
+      const v = s1.orientation === "V" ? s1 : s2;
+      const ix = v.a.x;
+      const iy = h.a.y;
+      if (ix > h.minX && ix < h.maxX && iy > v.minY && iy < v.maxY) {
+        count += 1;
+      }
+    }
+  }
+  return count;
+}
+
+function countParallelOverlaps(segmentsA, segmentsB) {
+  let count = 0;
+  for (let i = 0; i < segmentsA.length; i += 1) {
+    const a = segmentsA[i];
+    if (a.orientation === "N") continue;
+    for (let j = 0; j < segmentsB.length; j += 1) {
+      const b = segmentsB[j];
+      if (a.orientation !== b.orientation || b.orientation === "N") continue;
+      if (a.orientation === "H") {
+        if (a.a.y !== b.a.y) continue;
+        const overlap = Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX);
+        if (overlap > 0) count += 1;
+      } else {
+        if (a.a.x !== b.a.x) continue;
+        const overlap = Math.min(a.maxY, b.maxY) - Math.max(a.minY, b.minY);
+        if (overlap > 0) count += 1;
+      }
+    }
+  }
+  return count;
+}
+
+function countTurns(points) {
+  if (!Array.isArray(points) || points.length < 3) return 0;
+  let turns = 0;
+  let prevDir = null;
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const a = points[i];
+    const b = points[i + 1];
+    const dir = a.x === b.x ? "V" : a.y === b.y ? "H" : null;
+    if (!dir) continue;
+    if (prevDir && prevDir !== dir) turns += 1;
+    prevDir = dir;
+  }
+  return turns;
+}
+
+function pathLength(points) {
+  if (!Array.isArray(points) || points.length < 2) return 0;
+  let len = 0;
+  for (let i = 0; i < points.length - 1; i += 1) {
+    len += Math.abs(points[i + 1].x - points[i].x) + Math.abs(points[i + 1].y - points[i].y);
+  }
+  return len;
 }
 
 function buildRouter2Input(state, dirtySet = null) {
@@ -931,10 +1213,11 @@ function buildRouter2Input(state, dirtySet = null) {
     const key = `${conn.from}:${conn.fromIndex ?? 0}->${conn.to}:${conn.toIndex ?? 0}`;
     connections.push({ from: fromNode.id, to: toNode.id, key, __ref: conn });
     if (conn.points && conn.points.length > 1 && (!dirtySet || !dirtySet.has(conn))) {
-      prevWires[key] = conn.points.map((pt) => ({
+      const gridPoints = conn.points.map((pt) => ({
         x: Math.round(pt.x / GRID_SIZE),
         y: Math.round(pt.y / GRID_SIZE),
       }));
+      prevWires[key] = densifyGridPath(gridPoints);
     }
   });
 
@@ -944,6 +1227,34 @@ function buildRouter2Input(state, dirtySet = null) {
 
   const prevSolution = Object.keys(prevWires).length ? { wires: prevWires } : null;
   return { nodes, connections, obstacles, prevSolution };
+}
+
+function densifyGridPath(points) {
+  if (!Array.isArray(points) || points.length < 2) return points || [];
+  const out = [];
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const a = points[i];
+    const b = points[i + 1];
+    if (!a || !b) continue;
+    if (!out.length) out.push({ x: a.x, y: a.y });
+    const dx = Math.sign(b.x - a.x);
+    const dy = Math.sign(b.y - a.y);
+    const steps = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y));
+    if ((dx !== 0 && dy !== 0) || steps === 0) {
+      if (out[out.length - 1].x !== b.x || out[out.length - 1].y !== b.y) {
+        out.push({ x: b.x, y: b.y });
+      }
+      continue;
+    }
+    let x = a.x;
+    let y = a.y;
+    for (let s = 0; s < steps; s += 1) {
+      x += dx;
+      y += dy;
+      out.push({ x, y });
+    }
+  }
+  return out;
 }
 
 function ensurePortNode(state, blockId, type, index, nodeMap, nodes) {
@@ -1004,14 +1315,15 @@ function blockToObstacles(block) {
 
 function applyRouter2Result(state, connections, result) {
   const paths = new Map();
+  const updated = [];
   connections.forEach((conn) => {
     const wire = result.wires.get(conn.key);
     if (!wire || !wire.points.length) {
       if (conn.__ref.points && conn.__ref.points.length) {
-        paths.set(conn.__ref, pointsToPath(conn.__ref.points));
+        updated.push(conn.__ref);
       } else {
         conn.__ref.points = [];
-        paths.set(conn.__ref, "");
+        updated.push(conn.__ref);
       }
       return;
     }
@@ -1021,10 +1333,134 @@ function applyRouter2Result(state, connections, result) {
     }));
     points = enforcePortStubs(state, conn.__ref, points);
     conn.__ref.points = points;
-    const d = pointsToPath(points);
-    paths.set(conn.__ref, d);
+    updated.push(conn.__ref);
+  });
+  normalizeSharedSourceJunctions(updated);
+  updated.forEach((conn) => {
+    const pts = Array.isArray(conn.points) ? conn.points : [];
+    paths.set(conn, pts.length ? pointsToPath(pts) : "");
   });
   return paths;
+}
+
+function normalizeSharedSourceJunctions(connections) {
+  if (!Array.isArray(connections) || connections.length < 2) return;
+  const preferredStubCells = 2;
+  const bySource = new Map();
+  connections.forEach((conn) => {
+    const key = `${conn.from}:${conn.fromIndex ?? 0}`;
+    if (!bySource.has(key)) bySource.set(key, []);
+    bySource.get(key).push(conn);
+  });
+
+  bySource.forEach((group) => {
+    if (!group || group.length < 2) return;
+    const turnInfos = group
+      .map((conn) => ({ conn, info: firstTurnInfo(conn.points) }))
+      .filter((item) => item.info && item.info.isSimpleL);
+    if (turnInfos.length < 2) return;
+    const initDir = turnInfos[0].info.initDir;
+    if (!turnInfos.every((item) => item.info.initDir === initDir)) return;
+
+    const turns = turnInfos.map((item) => item.info.turn);
+    if (initDir === "H") {
+      const y0 = turns[0].y;
+      if (!turns.every((p) => p.y === y0)) return;
+      const xs = turns.map((p) => p.x);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      if (maxX - minX > GRID_SIZE * 4) return;
+      const targetX = turnInfos[0].info.forwardSign > 0 ? maxX : minX;
+      turnInfos.forEach(({ conn, info }) => {
+        if (info.turn.x === targetX) return;
+        if (!canAdjustSharedTurn(conn.points, info, "x", targetX, preferredStubCells)) return;
+        // Keep path shape; only move the first bend column.
+        conn.points[info.turnIndex].x = targetX;
+        conn.points[info.turnIndex + 1].x = targetX;
+      });
+    } else if (initDir === "V") {
+      const x0 = turns[0].x;
+      if (!turns.every((p) => p.x === x0)) return;
+      const ys = turns.map((p) => p.y);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      if (maxY - minY > GRID_SIZE * 4) return;
+      const targetY = turnInfos[0].info.forwardSign > 0 ? maxY : minY;
+      turnInfos.forEach(({ conn, info }) => {
+        if (info.turn.y === targetY) return;
+        if (!canAdjustSharedTurn(conn.points, info, "y", targetY, preferredStubCells)) return;
+        conn.points[info.turnIndex].y = targetY;
+        conn.points[info.turnIndex + 1].y = targetY;
+      });
+    }
+  });
+}
+
+function canAdjustSharedTurn(points, info, axis, targetValue, preferredStubCells = 2) {
+  if (!Array.isArray(points) || !info) return false;
+  const idxA = info.turnIndex;
+  const idxB = info.turnIndex + 1;
+  if (idxA < 0 || idxB >= points.length) return false;
+  const current = points.map((pt) => ({ x: pt.x, y: pt.y }));
+  const proposed = points.map((pt) => ({ x: pt.x, y: pt.y }));
+  proposed[idxA][axis] = targetValue;
+  proposed[idxB][axis] = targetValue;
+  const currStart = minTurnDistanceToEndpointCells(current, 0);
+  const currEnd = minTurnDistanceToEndpointCells(current, current.length - 1);
+  const nextStart = minTurnDistanceToEndpointCells(proposed, 0);
+  const nextEnd = minTurnDistanceToEndpointCells(proposed, proposed.length - 1);
+  if (!Number.isFinite(nextStart) || !Number.isFinite(nextEnd)) return false;
+  if (nextStart < preferredStubCells && currStart >= preferredStubCells) return false;
+  if (nextEnd < preferredStubCells && currEnd >= preferredStubCells) return false;
+  return true;
+}
+
+function minTurnDistanceToEndpointCells(points, endpointIdx) {
+  if (!Array.isArray(points) || points.length < 3) return Number.POSITIVE_INFINITY;
+  const endpoint = points[endpointIdx];
+  if (!endpoint) return Number.POSITIVE_INFINITY;
+  let minCells = Number.POSITIVE_INFINITY;
+  for (let i = 1; i < points.length - 1; i += 1) {
+    const prevDir = segmentDir(points[i - 1], points[i]);
+    const nextDir = segmentDir(points[i], points[i + 1]);
+    if (!prevDir || !nextDir || prevDir === nextDir) continue;
+    const distPx = Math.abs(points[i].x - endpoint.x) + Math.abs(points[i].y - endpoint.y);
+    const distCells = distPx / GRID_SIZE;
+    if (distCells < minCells) minCells = distCells;
+  }
+  return minCells;
+}
+
+function firstTurnInfo(points) {
+  if (!Array.isArray(points) || points.length < 4) return null;
+  const d0 = segmentDir(points[0], points[1]);
+  if (!d0) return null;
+  let turnIndex = -1;
+  for (let i = 1; i < points.length - 1; i += 1) {
+    const d = segmentDir(points[i], points[i + 1]);
+    if (!d) continue;
+    if (d !== d0) {
+      turnIndex = i;
+      break;
+    }
+  }
+  if (turnIndex < 1 || turnIndex + 1 >= points.length) return null;
+  const initDir = d0;
+  const turn = points[turnIndex];
+  const postDir = segmentDir(points[turnIndex], points[turnIndex + 1]);
+  const isSimpleL = Boolean(postDir && postDir !== d0 && turnIndex === 1);
+  const forwardSign =
+    initDir === "H"
+      ? Math.sign(points[1].x - points[0].x) || 1
+      : Math.sign(points[1].y - points[0].y) || 1;
+  return { initDir, turnIndex, turn, isSimpleL, forwardSign };
+}
+
+function segmentDir(a, b) {
+  if (!a || !b) return null;
+  if (a.x === b.x && a.y !== b.y) return "V";
+  if (a.y === b.y && a.x !== b.x) return "H";
+  return null;
 }
 
 function enforcePortStubs(state, conn, points) {

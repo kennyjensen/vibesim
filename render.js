@@ -1,5 +1,10 @@
 import { snap, distancePointToSegment, GRID_SIZE, segmentLengthStats } from "./geometry.js";
-import { routeAllConnections, routeDirtyConnections } from "./router.js";
+import {
+  routeAllConnections,
+  routeDirtyConnections,
+  analyzeConnectionGeometry,
+  normalizeConnectionJunctions,
+} from "./router.js";
 import { renderScope } from "./sim.js";
 import { buildBlockTemplates } from "./blocks/index.js";
 import { computeSubsystemPortLabelFrame } from "./blocks/utility.js";
@@ -28,6 +33,8 @@ const USERFUNC_SETTLE_RETRIES = 4;
 const USERFUNC_SETTLE_DELAY_MS = 60;
 const TF_MIN_WIDTH = 80;
 const DTF_MIN_WIDTH = 80;
+const DIRTY_ROUTE_SCORE_WORSE_MARGIN = 8;
+const DIRTY_ROUTE_SCORE_WORSE_RATIO = 1.2;
 
 function createSvgElement(tag, attrs = {}, text = "") {
   const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
@@ -520,7 +527,7 @@ function getCrossingsOnVertical(seg, otherSegments) {
   return hits;
 }
 
-function buildPathWithHops(segments, otherSegments) {
+export function buildPathWithHops(segments, otherSegments, hopClaims = null) {
   if (!segments.length) return "";
   const commands = [];
   let current = segments[0].a;
@@ -544,8 +551,11 @@ function buildPathWithHops(segments, otherSegments) {
         .filter((x) => x > seg.minX + HOP_RADIUS && x < seg.maxX - HOP_RADIUS)
         .sort((a, b) => (dir === 1 ? a - b : b - a));
       crossings.forEach((x) => {
+        const key = `${x},${seg.a.y}`;
+        if (hopClaims && hopClaims.has(key)) return;
         commands.push(`L ${x - HOP_RADIUS * dir} ${seg.a.y}`);
         commands.push(`a ${HOP_RADIUS} ${HOP_RADIUS} 0 0 1 ${HOP_RADIUS * 2 * dir} 0`);
+        if (hopClaims) hopClaims.add(key);
       });
       commands.push(`L ${seg.b.x} ${seg.b.y}`);
     } else {
@@ -554,8 +564,11 @@ function buildPathWithHops(segments, otherSegments) {
         .filter((y) => y > seg.minY + HOP_RADIUS && y < seg.maxY - HOP_RADIUS)
         .sort((a, b) => (dir === 1 ? a - b : b - a));
       crossings.forEach((y) => {
+        const key = `${seg.a.x},${y}`;
+        if (hopClaims && hopClaims.has(key)) return;
         commands.push(`L ${seg.a.x} ${y - HOP_RADIUS * dir}`);
         commands.push(`a ${HOP_RADIUS} ${HOP_RADIUS} 0 0 1 0 ${HOP_RADIUS * 2 * dir}`);
+        if (hopClaims) hopClaims.add(key);
       });
       commands.push(`L ${seg.b.x} ${seg.b.y}`);
     }
@@ -890,6 +903,9 @@ export function createRenderer({
       if (!Array.isArray(points) || points.length < 2) return;
       conn.points = points;
     });
+    // Collapse nearby tees into shared corner/cross points across all connections,
+    // including unchanged wires that kept pre-existing paths.
+    normalizeConnectionJunctions(state.connections);
     applyWirePaths(new Map());
     state.routingDirty = false;
     if (state.dirtyBlocks) state.dirtyBlocks.clear();
@@ -2023,18 +2039,34 @@ export function createRenderer({
         ? Array.from(dirtySet).map((conn) => `${conn.from}:${conn.fromIndex ?? 0}->${conn.to}:${conn.toIndex ?? 0}`)
         : [];
       if (!needsFullRoute && dirtySet && dirtySet.size > 0) {
+        const beforeQuality = captureConnectionQuality(dirtySet);
         state.debugRouteMode = "dirty";
         state.debugRouteTimeLimit = dirtyTimeLimitMs;
         paths = routeDirtyConnections(state, worldW, worldH, { x: 0, y: 0 }, dirtySet, dirtyTimeLimitMs);
         applyWirePaths(paths);
-        if (state.debugOverlapCount > 0) {
+        const dirtyRouter = typeof window !== "undefined" ? window.__routerLast : null;
+        const dirtyFailures = dirtyRouter?.result?.failures || [];
+        const dirtyFailedCount = Number(dirtyRouter?.result?.cost?.failed || 0);
+        const dirtyTimedOut = dirtyFailures.some((f) => f?.reason === "timeout");
+        const dirtyFailed = dirtyTimedOut || dirtyFailedCount > 0 || dirtyFailures.length > 0;
+        const dirtyQualityIssue = evaluateDirtyRouteQuality(dirtySet, beforeQuality);
+        state.debugQualityIssue = dirtyQualityIssue || "";
+        if (state.debugOverlapCount > 0 || dirtyQualityIssue || dirtyFailed) {
           state.debugFallbackFullRoute = true;
+          if (dirtyTimedOut) {
+            state.debugFallbackReason = "dirty route timeout";
+          } else if (dirtyFailed) {
+            state.debugFallbackReason = "dirty route failed";
+          } else {
+            state.debugFallbackReason = dirtyQualityIssue || "wire overlap";
+          }
           state.debugRouteMode = "fallback-full";
           state.debugRouteTimeLimit = 2000;
           const fallbackPaths = routeAllConnections(state, worldW, worldH, { x: 0, y: 0 }, 2000);
           applyWirePaths(fallbackPaths);
         } else {
           state.debugFallbackFullRoute = false;
+          state.debugFallbackReason = "";
         }
         refreshDebugLog();
       } else if (needsFullRoute || !dirtySet) {
@@ -2043,6 +2075,8 @@ export function createRenderer({
         paths = routeAllConnections(state, worldW, worldH, { x: 0, y: 0 }, fullTimeLimitMs);
         applyWirePaths(paths);
         state.debugFallbackFullRoute = false;
+        state.debugFallbackReason = "";
+        state.debugQualityIssue = "";
         refreshDebugLog();
       } else {
         updateSelectionBox();
@@ -2057,6 +2091,69 @@ export function createRenderer({
       updateSelectionBox();
       updateWireCornerHandles();
     });
+  }
+
+  function captureConnectionQuality(connectionSet) {
+    const quality = new Map();
+    (connectionSet || new Set()).forEach((conn) => {
+      const pts = Array.isArray(conn?.points)
+        ? conn.points.map((pt) => ({ x: Number(pt.x), y: Number(pt.y) }))
+        : [];
+      quality.set(conn, {
+        score: routeQualityScore(pts),
+        hasPath: pts.length >= 2,
+      });
+    });
+    return quality;
+  }
+
+  function routeQualityScore(points) {
+    if (!Array.isArray(points) || points.length < 2) return Number.POSITIVE_INFINITY;
+    let turnCount = 0;
+    let prevDir = null;
+    let length = 0;
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const a = points[i];
+      const b = points[i + 1];
+      const dx = Math.abs((b?.x ?? 0) - (a?.x ?? 0));
+      const dy = Math.abs((b?.y ?? 0) - (a?.y ?? 0));
+      if (dx && dy) return Number.POSITIVE_INFINITY;
+      const dir = dx ? "H" : dy ? "V" : null;
+      if (dir) {
+        if (prevDir && prevDir !== dir) turnCount += 1;
+        prevDir = dir;
+      }
+      length += dx + dy;
+    }
+    return turnCount * 20 + length / GRID_SIZE;
+  }
+
+  function evaluateDirtyRouteQuality(dirtySet, beforeQuality) {
+    const analysis = analyzeConnectionGeometry(state.connections, { ignoreSharedPorts: true });
+    state.debugQualityTotals = analysis?.totals || null;
+    if (analysis?.totals?.nonOrthogonal > 0) return "non-orthogonal segments";
+    if (analysis?.totals?.selfCrosses > 0) return "self-crossing wire";
+    if (analysis?.totals?.overlaps > 0) return "parallel wire overlap";
+
+    const degraded = [];
+    (dirtySet || new Set()).forEach((conn) => {
+      const before = beforeQuality?.get(conn);
+      if (!before?.hasPath || !Number.isFinite(before.score)) return;
+      const afterScore = routeQualityScore(conn.points);
+      if (!Number.isFinite(afterScore)) {
+        degraded.push(`${conn.from}->${conn.to}:invalid`);
+        return;
+      }
+      const worseByMargin = afterScore > before.score + DIRTY_ROUTE_SCORE_WORSE_MARGIN;
+      const worseByRatio = afterScore > before.score * DIRTY_ROUTE_SCORE_WORSE_RATIO;
+      if (worseByMargin && worseByRatio) {
+        degraded.push(`${conn.from}:${conn.fromIndex ?? 0}->${conn.to}:${conn.toIndex ?? 0}`);
+      }
+    });
+    if (degraded.length) {
+      return `degraded dirty route (${degraded.slice(0, 4).join(",")})`;
+    }
+    return "";
   }
 
   async function forceFullRoute(timeLimitMs = FORCE_FULL_ROUTE_TIME_LIMIT_MS) {
@@ -2082,6 +2179,7 @@ export function createRenderer({
 
   function applyWirePaths(paths) {
     const segmentMap = new Map();
+    const hopClaims = new Set();
     let overlapCount = 0;
     state.connections.forEach((conn) => {
       let points = conn.points || [];
@@ -2147,7 +2245,7 @@ export function createRenderer({
       }
       const segments = segmentMap.get(conn) || [];
       const otherSegments = priorSegments.slice();
-      const d = buildPathWithHops(segments, otherSegments);
+      const d = buildPathWithHops(segments, otherSegments, hopClaims);
       if (!isValidPathString(d)) {
         if (DEBUG_WIRE_CHECKS && debugLog) {
           writeDebug(debugLog, `[wire ${conn.from}->${conn.to}] invalid path string`);
@@ -3322,8 +3420,16 @@ export function createRenderer({
     if (typeof state.debugOverlapCount === "number") {
       summary.push(`overlapCount=${state.debugOverlapCount}`);
     }
+    if (state.debugQualityTotals) {
+      const q = state.debugQualityTotals;
+      summary.push(`quality=self:${q.selfCrosses ?? 0} overlap:${q.overlaps ?? 0} nonOrtho:${q.nonOrthogonal ?? 0}`);
+    }
+    if (state.debugQualityIssue) {
+      summary.push(`qualityIssue=${state.debugQualityIssue}`);
+    }
     if (state.debugFallbackFullRoute) {
       summary.push("fallbackFullRoute=true");
+      if (state.debugFallbackReason) summary.push(`fallbackReason=${state.debugFallbackReason}`);
     }
     const errorConnections = state.connections.filter((conn) => conn.path?.classList?.contains("wire-error"));
     if (errorConnections.length) {
