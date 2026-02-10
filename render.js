@@ -504,27 +504,27 @@ function buildSegments(points, owner) {
 }
 
 function getCrossingsOnHorizontal(seg, otherSegments) {
-  const hits = [];
+  const hits = new Set();
   const y = seg.y;
   otherSegments.forEach((other) => {
     if (other.orientation !== "V") return;
     if (other.x <= seg.minX || other.x >= seg.maxX) return;
     if (y <= other.minY || y >= other.maxY) return;
-    hits.push(other.x);
+    hits.add(other.x);
   });
-  return hits;
+  return Array.from(hits);
 }
 
 function getCrossingsOnVertical(seg, otherSegments) {
-  const hits = [];
+  const hits = new Set();
   const x = seg.x;
   otherSegments.forEach((other) => {
     if (other.orientation !== "H") return;
     if (other.y <= seg.minY || other.y >= seg.maxY) return;
     if (x <= other.minX || x >= other.maxX) return;
-    hits.push(other.y);
+    hits.add(other.y);
   });
-  return hits;
+  return Array.from(hits);
 }
 
 export function buildPathWithHops(segments, otherSegments, hopClaims = null) {
@@ -532,6 +532,32 @@ export function buildPathWithHops(segments, otherSegments, hopClaims = null) {
   const commands = [];
   let current = segments[0].a;
   commands.push(`M ${current.x} ${current.y}`);
+  const hopKey = (x, y) => `${Math.round(x)},${Math.round(y)}`;
+  const canDrawHop = (claims, key, orientation) => {
+    if (!claims) return true;
+    const opposite = orientation === "H" ? "V" : "H";
+    // New structure: Map<"x,y", Set<"H"|"V">>
+    if (typeof claims.get === "function" && typeof claims.set === "function") {
+      let set = claims.get(key);
+      if (!set) {
+        set = new Set([orientation]);
+        claims.set(key, set);
+        return true;
+      }
+      if (set.has(opposite)) return false;
+      set.add(orientation);
+      return true;
+    }
+    // Back-compat: Set style claims (store orientation-qualified keys).
+    if (typeof claims.has === "function" && typeof claims.add === "function") {
+      const sameKey = `${key}|${orientation}`;
+      const oppositeKey = `${key}|${opposite}`;
+      if (claims.has(oppositeKey) || claims.has(key)) return false;
+      claims.add(sameKey);
+      return true;
+    }
+    return true;
+  };
 
   segments.forEach((seg) => {
     if (current.x !== seg.a.x || current.y !== seg.a.y) {
@@ -551,11 +577,10 @@ export function buildPathWithHops(segments, otherSegments, hopClaims = null) {
         .filter((x) => x > seg.minX + HOP_RADIUS && x < seg.maxX - HOP_RADIUS)
         .sort((a, b) => (dir === 1 ? a - b : b - a));
       crossings.forEach((x) => {
-        const key = `${x},${seg.a.y}`;
-        if (hopClaims && hopClaims.has(key)) return;
+        const key = hopKey(x, seg.a.y);
+        if (!canDrawHop(hopClaims, key, "H")) return;
         commands.push(`L ${x - HOP_RADIUS * dir} ${seg.a.y}`);
         commands.push(`a ${HOP_RADIUS} ${HOP_RADIUS} 0 0 1 ${HOP_RADIUS * 2 * dir} 0`);
-        if (hopClaims) hopClaims.add(key);
       });
       commands.push(`L ${seg.b.x} ${seg.b.y}`);
     } else {
@@ -564,11 +589,10 @@ export function buildPathWithHops(segments, otherSegments, hopClaims = null) {
         .filter((y) => y > seg.minY + HOP_RADIUS && y < seg.maxY - HOP_RADIUS)
         .sort((a, b) => (dir === 1 ? a - b : b - a));
       crossings.forEach((y) => {
-        const key = `${seg.a.x},${y}`;
-        if (hopClaims && hopClaims.has(key)) return;
+        const key = hopKey(seg.a.x, y);
+        if (!canDrawHop(hopClaims, key, "V")) return;
         commands.push(`L ${seg.a.x} ${y - HOP_RADIUS * dir}`);
         commands.push(`a ${HOP_RADIUS} ${HOP_RADIUS} 0 0 1 0 ${HOP_RADIUS * 2 * dir}`);
-        if (hopClaims) hopClaims.add(key);
       });
       commands.push(`L ${seg.b.x} ${seg.b.y}`);
     }
@@ -2179,7 +2203,7 @@ export function createRenderer({
 
   function applyWirePaths(paths) {
     const segmentMap = new Map();
-    const hopClaims = new Set();
+    const hopClaims = new Map();
     let overlapCount = 0;
     state.connections.forEach((conn) => {
       let points = conn.points || [];
