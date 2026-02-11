@@ -1215,8 +1215,6 @@ function init() {
     "examples/emf.yaml",
     "examples/antiwindup.yaml",
     "examples/complementary.yaml",
-    "examples/beam.yaml",
-    "examples/trapezoid.yaml",
   ];
   if (examplesList) {
     examplesList.innerHTML = "";
