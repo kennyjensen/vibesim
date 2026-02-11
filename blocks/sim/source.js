@@ -1,9 +1,10 @@
 import { getBlockState, getInputValue } from "./helpers.js";
 
-export const resolveLabelSourcesOnce = (blocks, outputs, inputMap, labelSinks) => {
+export const resolveLabelSourcesOnce = (labelSourceBlocks, outputs, inputMap, labelSinks) => {
   let changed = false;
-  blocks.forEach((block) => {
-    if (block.type !== "labelSource") return;
+  labelSourceBlocks.forEach((block) => {
+    if (!block || block.type !== "labelSource") return;
+    if (block.params?.isExternalPort === true) return;
     const name = String(block.params.name || "").trim();
     let nextVal = 0;
     if (name) {

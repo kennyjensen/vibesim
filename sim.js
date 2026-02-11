@@ -13,9 +13,69 @@ function refreshParamDisplay(scopeBlock) {
   window.vibesimUpdateParamDisplay(scopeBlock?.id);
 }
 
+function sourceBlockIdFromKey(key) {
+  if (typeof key !== "string" || !key) return null;
+  const splitIdx = key.indexOf(":");
+  return splitIdx >= 0 ? key.slice(0, splitIdx) : key;
+}
+
+function buildAlgebraicPlan(algebraicBlocks, inputMap) {
+  const byId = new Map();
+  algebraicBlocks.forEach((entry) => byId.set(entry.block.id, entry));
+  if (byId.size === 0) return { ordered: [], hasCycle: false };
+
+  const indegree = new Map();
+  const outEdges = new Map();
+  byId.forEach((_, id) => {
+    indegree.set(id, 0);
+    outEdges.set(id, new Set());
+  });
+
+  byId.forEach((_, targetId) => {
+    const inputs = inputMap.get(targetId) || [];
+    inputs.forEach((srcKey) => {
+      const srcId = sourceBlockIdFromKey(srcKey);
+      if (!srcId || !byId.has(srcId) || srcId === targetId) return;
+      const edges = outEdges.get(srcId);
+      if (edges.has(targetId)) return;
+      edges.add(targetId);
+      indegree.set(targetId, (indegree.get(targetId) || 0) + 1);
+    });
+  });
+
+  const queue = [];
+  indegree.forEach((deg, id) => {
+    if (deg === 0) queue.push(id);
+  });
+  const ordered = [];
+  let readIdx = 0;
+  while (readIdx < queue.length) {
+    const id = queue[readIdx];
+    readIdx += 1;
+    ordered.push(byId.get(id));
+    outEdges.get(id).forEach((neighbor) => {
+      const next = (indegree.get(neighbor) || 0) - 1;
+      indegree.set(neighbor, next);
+      if (next === 0) queue.push(neighbor);
+    });
+  }
+  const hasCycle = ordered.length !== byId.size;
+  return { ordered: hasCycle ? algebraicBlocks : ordered, hasCycle };
+}
+
 export function simulate({ state, runtimeInput, statusEl, downloadFile }) {
   statusEl.textContent = "Running...";
   const blocks = Array.from(state.blocks.values());
+  const blockHandlers = blocks.map((block) => ({ block, handler: simHandlers[block.type] }));
+  const initBlocks = blockHandlers.filter(({ handler }) => Boolean(handler?.init));
+  const outputBlocks = blockHandlers.filter(({ handler }) => Boolean(handler?.output));
+  const algebraicBlocks = blockHandlers.filter(({ handler }) => Boolean(handler?.algebraic));
+  const afterStepBlocks = blockHandlers.filter(({ handler }) => Boolean(handler?.afterStep));
+  const updateBlocks = blockHandlers.filter(({ handler }) => Boolean(handler?.update));
+  const finalizeBlocks = blockHandlers.filter(({ handler }) => Boolean(handler?.finalize));
+  const hasLabelResolution = blocks.some((b) => b.type === "labelSource" || b.type === "labelSink");
+  const labelSourceBlocks = hasLabelResolution ? blocks.filter((b) => b.type === "labelSource") : [];
+  const needsAlgebraicSolve = hasLabelResolution || algebraicBlocks.length > 0;
   const scopes = blocks.filter((b) => b.type === "scope");
   const xyScopes = blocks.filter((b) => b.type === "xyScope");
   const fileSinks = blocks.filter((b) => b.type === "fileSink");
@@ -68,6 +128,7 @@ export function simulate({ state, runtimeInput, statusEl, downloadFile }) {
     if (!inputs) return;
     if (conn.toIndex < inputs.length) inputs[conn.toIndex] = sourceKey(conn.from, conn.fromIndex);
   });
+  const algebraicPlan = buildAlgebraicPlan(algebraicBlocks, inputMap);
 
   const dt = Math.max(1e-6, Number(state.sampleTime ?? variables.dt ?? variables.sampleTime ?? 0.01) || 0.01);
   const requestedDuration = Number(runtimeInput.value);
@@ -87,10 +148,7 @@ export function simulate({ state, runtimeInput, statusEl, downloadFile }) {
     variables,
   };
 
-  blocks.forEach((block) => {
-    const handler = simHandlers[block.type];
-    if (handler?.init) handler.init(ctx, block);
-  });
+  initBlocks.forEach(({ block, handler }) => handler.init(ctx, block));
 
   let algebraicLoopFailed = false;
   let algebraicLoopTime = 0;
@@ -102,44 +160,41 @@ export function simulate({ state, runtimeInput, statusEl, downloadFile }) {
     ctx.t = t;
     ctx.outputs = outputs;
 
-    blocks.forEach((block) => {
-      const handler = simHandlers[block.type];
-      if (handler?.output) handler.output(ctx, block);
-    });
+    outputBlocks.forEach(({ block, handler }) => handler.output(ctx, block));
 
     const resolveLabelSources = () =>
-      resolveLabelSourcesOnce(blocks, outputs, inputMap, labelSinks);
+      resolveLabelSourcesOnce(labelSourceBlocks, outputs, inputMap, labelSinks);
 
-    let progress = true;
-    let iter = 0;
-    const maxIter = 50;
-    while (progress && iter < maxIter) {
-      iter += 1;
-      progress = false;
-      if (resolveLabelSources()) progress = true;
-      blocks.forEach((block) => {
-        const handler = simHandlers[block.type];
-        if (!handler?.algebraic) return;
-        const result = handler.algebraic(ctx, block);
-        if (result?.updated) progress = true;
-      });
-      if (resolveLabelSources()) progress = true;
+    if (needsAlgebraicSolve) {
+      if (!hasLabelResolution && !algebraicPlan.hasCycle) {
+        algebraicPlan.ordered.forEach(({ block, handler }) => {
+          handler.algebraic(ctx, block);
+        });
+      } else {
+      let progress = true;
+      let iter = 0;
+      const maxIter = 50;
+      while (progress && iter < maxIter) {
+        iter += 1;
+        progress = false;
+        if (hasLabelResolution && resolveLabelSources()) progress = true;
+        algebraicPlan.ordered.forEach(({ block, handler }) => {
+          const result = handler.algebraic(ctx, block);
+          if (result?.updated) progress = true;
+        });
+        if (hasLabelResolution && resolveLabelSources()) progress = true;
+      }
+      if (progress && iter >= maxIter) {
+        algebraicLoopFailed = true;
+        algebraicLoopTime = t;
+        break;
+      }
+      }
     }
-    if (progress && iter >= maxIter) {
-      algebraicLoopFailed = true;
-      algebraicLoopTime = t;
-      break;
-    }
 
-    blocks.forEach((block) => {
-      const handler = simHandlers[block.type];
-      if (handler?.afterStep) handler.afterStep(ctx, block);
-    });
+    afterStepBlocks.forEach(({ block, handler }) => handler.afterStep(ctx, block));
 
-    blocks.forEach((block) => {
-      const handler = simHandlers[block.type];
-      if (handler?.update) handler.update(ctx, block);
-    });
+    updateBlocks.forEach(({ block, handler }) => handler.update(ctx, block));
   }
 
   if (algebraicLoopFailed) {
@@ -147,10 +202,7 @@ export function simulate({ state, runtimeInput, statusEl, downloadFile }) {
     return;
   }
 
-  blocks.forEach((block) => {
-    const handler = simHandlers[block.type];
-    if (handler?.finalize) handler.finalize(ctx, block);
-  });
+  finalizeBlocks.forEach(({ block, handler }) => handler.finalize(ctx, block));
 
   blocks.forEach((block) => {
     if (block.type !== "fileSink") return;
@@ -258,8 +310,18 @@ export function renderScope(scopeBlock) {
   const t1 = tMaxParam != null ? tMaxParam : t1Raw;
   const tRange = t1 - t0;
   const activeSeries = series.filter((_, idx) => (connected ? connected[idx] : true));
-  const values = activeSeries.flat().filter((v) => v != null);
-  if (values.length === 0) {
+  let observedMin = Infinity;
+  let observedMax = -Infinity;
+  let observedCount = 0;
+  activeSeries.forEach((seriesValues) => {
+    seriesValues.forEach((v) => {
+      if (v == null || !Number.isFinite(v)) return;
+      observedCount += 1;
+      if (v < observedMin) observedMin = v;
+      if (v > observedMax) observedMax = v;
+    });
+  });
+  if (observedCount === 0) {
     scopeBlock.scopePaths.forEach((path) => path.setAttribute("d", ""));
     if (axes?.xTickLabels) axes.xTickLabels.forEach((label) => label.setAttribute("display", "none"));
     if (axes?.yTickLabels) axes.yTickLabels.forEach((label) => label.setAttribute("display", "none"));
@@ -273,8 +335,8 @@ export function renderScope(scopeBlock) {
     return;
   }
 
-  let maxVal = Math.max(...values, 1);
-  let minVal = Math.min(...values, -1);
+  let maxVal = Math.max(observedMax, 1);
+  let minVal = Math.min(observedMin, -1);
   if (yMinParam != null) minVal = yMinParam;
   if (yMaxParam != null) maxVal = yMaxParam;
   if (maxVal === minVal) {
@@ -492,7 +554,22 @@ export function renderXYScope(scopeBlock) {
   const xMaxParam = parseLimit(scopeBlock.params?.xMax);
   const yMinParam = parseLimit(scopeBlock.params?.yMin);
   const yMaxParam = parseLimit(scopeBlock.params?.yMax);
-  const pairs = xSeries.map((x, idx) => ({ x, y: ySeries[idx] })).filter((p) => p.x != null && p.y != null);
+  const pairs = [];
+  let observedXMin = Infinity;
+  let observedXMax = -Infinity;
+  let observedYMin = Infinity;
+  let observedYMax = -Infinity;
+  const pairCount = Math.min(xSeries.length, ySeries.length);
+  for (let idx = 0; idx < pairCount; idx += 1) {
+    const x = xSeries[idx];
+    const y = ySeries[idx];
+    if (x == null || y == null || !Number.isFinite(x) || !Number.isFinite(y)) continue;
+    pairs.push({ x, y });
+    if (x < observedXMin) observedXMin = x;
+    if (x > observedXMax) observedXMax = x;
+    if (y < observedYMin) observedYMin = y;
+    if (y > observedYMax) observedYMax = y;
+  }
   if (pairs.length === 0) {
     scopeBlock.scopePaths.forEach((path) => path.setAttribute("d", ""));
     if (axes?.xTickLabels) axes.xTickLabels.forEach((label) => label.setAttribute("display", "none"));
@@ -506,10 +583,10 @@ export function renderXYScope(scopeBlock) {
     refreshParamDisplay(scopeBlock);
     return;
   }
-  let xMin = Math.min(...pairs.map((p) => p.x));
-  let xMax = Math.max(...pairs.map((p) => p.x));
-  let yMin = Math.min(...pairs.map((p) => p.y));
-  let yMax = Math.max(...pairs.map((p) => p.y));
+  let xMin = observedXMin;
+  let xMax = observedXMax;
+  let yMin = observedYMin;
+  let yMax = observedYMax;
   if (xMinParam != null) xMin = xMinParam;
   if (xMaxParam != null) xMax = xMaxParam;
   if (yMinParam != null) yMin = yMinParam;

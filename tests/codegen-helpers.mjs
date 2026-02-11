@@ -109,6 +109,13 @@ export function parseYaml(text) {
     if (raw === "false") return false;
     if (raw === "[]") return [];
     if (raw === "{}") return {};
+    if ((raw.startsWith("[") && raw.endsWith("]")) || (raw.startsWith("{") && raw.endsWith("}"))) {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        // fall through and keep as plain text
+      }
+    }
     if (/^-?\d+(\.\d+)?$/.test(raw)) return Number(raw);
     if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
       try {
