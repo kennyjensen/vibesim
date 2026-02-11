@@ -8,10 +8,7 @@ blocks:
     y: 1460
     rotation: 0
     params:
-      signs:
-        - 1
-        - -1
-        - 1
+      signs: [1,-1,1]
   -
     id: b3
     type: pid
@@ -29,12 +26,8 @@ blocks:
     y: 1430
     rotation: 0
     params:
-      num:
-        - 1
-      den:
-        - I
-        - 0
-        - -mg
+      num: [1]
+      den: ["I",0,"-mg"]
   -
     id: b6
     type: labelSource

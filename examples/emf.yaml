@@ -16,11 +16,8 @@ blocks:
     y: 1610
     rotation: 0
     params:
-      num:
-        - K
-      den:
-        - "\\tau"
-        - 1
+      num: ["K"]
+      den: ["\\tau",1]
   -
     id: b4
     type: sum
@@ -28,10 +25,7 @@ blocks:
     y: 1640
     rotation: 0
     params:
-      signs:
-        - 1
-        - 1
-        - 1
+      signs: [1,1,1]
   -
     id: b5
     type: tf
@@ -39,12 +33,8 @@ blocks:
     y: 1610
     rotation: 0
     params:
-      num:
-        - 1
-      den:
-        - I
-        - 0
-        - -mg
+      num: [1]
+      den: ["I",0,"-mg"]
   -
     id: b6
     type: pid
@@ -70,10 +60,7 @@ blocks:
     y: 1890
     rotation: 270
     params:
-      signs:
-        - 1
-        - 1
-        - -1
+      signs: [1,1,-1]
   -
     id: b9
     type: labelSink

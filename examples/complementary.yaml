@@ -24,10 +24,7 @@ blocks:
     y: 1930
     rotation: 0
     params:
-      signs:
-        - 1
-        - 1
-        - 1
+      signs: [1,1,1]
   -
     id: b4
     type: derivative
@@ -69,10 +66,7 @@ blocks:
     y: 1860
     rotation: 0
     params:
-      signs:
-        - 1
-        - 1
-        - 1
+      signs: [1,1,1]
   -
     id: b9
     type: sum
@@ -80,10 +74,7 @@ blocks:
     y: 2020
     rotation: 0
     params:
-      signs:
-        - 1
-        - 1
-        - 1
+      signs: [1,1,1]
   -
     id: b10
     type: integrator

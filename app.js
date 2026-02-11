@@ -580,7 +580,8 @@ function sanitizeParamsForSave(params) {
       if (!value) return;
       visible[key] = true;
     });
-    cleaned._visible = visible;
+    if (Object.keys(visible).length > 0) cleaned._visible = visible;
+    else delete cleaned._visible;
   }
   return cleaned;
 }
@@ -818,6 +819,14 @@ function loadDiagram(data, options = {}) {
 
 function toYAML(data) {
   const lines = [];
+  const isScalarArray = (value) =>
+    Array.isArray(value)
+    && value.length > 0
+    && value.every((item) => {
+      if (item === null || item === undefined) return true;
+      const t = typeof item;
+      return t === "number" || t === "string" || t === "boolean";
+    });
   const isPointPairArray = (value) =>
     Array.isArray(value)
     && value.length > 0
@@ -830,6 +839,10 @@ function toYAML(data) {
     if (Array.isArray(value)) {
       if (value.length === 0) {
         lines.push(`${" ".repeat(indent)}[]`);
+        return;
+      }
+      if (isScalarArray(value)) {
+        lines.push(`${" ".repeat(indent)}${JSON.stringify(value)}`);
         return;
       }
       if (isPointPairArray(value)) {
@@ -855,6 +868,10 @@ function toYAML(data) {
       entries.forEach(([key, val]) => {
         if (Array.isArray(val) && val.length === 0) {
           lines.push(`${" ".repeat(indent)}${key}: []`);
+          return;
+        }
+        if (isScalarArray(val)) {
+          lines.push(`${" ".repeat(indent)}${key}: ${JSON.stringify(val)}`);
           return;
         }
         if (isPointPairArray(val)) {

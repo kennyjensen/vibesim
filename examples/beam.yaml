@@ -45,8 +45,6 @@ blocks:
               initial: 0
               min: -inf
               max: inf
-              _visible:
-                {}
           -
             id: b2
             type: integrator
@@ -66,12 +64,7 @@ blocks:
             y: 1380
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b4
             type: sum
@@ -79,12 +72,7 @@ blocks:
             y: 1380
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b5
             type: gain
@@ -93,8 +81,6 @@ blocks:
             rotation: 0
             params:
               gain: -6
-              _visible:
-                {}
           -
             id: b6
             type: labelSink
@@ -104,8 +90,6 @@ blocks:
             params:
               name: O1
               showNode: true
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b7
@@ -115,8 +99,6 @@ blocks:
             rotation: 0
             params:
               name: In-1
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b8
@@ -126,8 +108,6 @@ blocks:
             rotation: 0
             params:
               name: "In+2"
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b9
@@ -137,8 +117,6 @@ blocks:
             rotation: 0
             params:
               name: "In+1"
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b10
@@ -148,8 +126,6 @@ blocks:
             rotation: 0
             params:
               name: In-2
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b11
@@ -159,8 +135,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b12
             type: gain
@@ -169,8 +143,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b13
             type: gain
@@ -179,8 +151,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b14
             type: gain
@@ -189,8 +159,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b15
             type: gain
@@ -199,8 +167,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b16
             type: gain
@@ -209,8 +175,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b17
             type: gain
@@ -219,8 +183,6 @@ blocks:
             rotation: 0
             params:
               gain: -6
-              _visible:
-                {}
           -
             id: b18
             type: gain
@@ -229,8 +191,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b19
             type: gain
@@ -239,8 +199,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b20
             type: gain
@@ -249,8 +207,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b21
             type: gain
@@ -259,8 +215,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b22
             type: gain
@@ -269,8 +223,6 @@ blocks:
             rotation: 0
             params:
               gain: -6
-              _visible:
-                {}
           -
             id: b23
             type: gain
@@ -279,8 +231,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b24
             type: gain
@@ -289,8 +239,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b25
             type: sum
@@ -298,12 +246,7 @@ blocks:
             y: 1860
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b26
             type: sum
@@ -311,12 +254,7 @@ blocks:
             y: 2340
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b27
             type: sum
@@ -324,12 +262,7 @@ blocks:
             y: 2340
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b28
             type: sum
@@ -337,12 +270,7 @@ blocks:
             y: 1860
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b29
             type: integrator
@@ -353,8 +281,6 @@ blocks:
               initial: 0
               min: -inf
               max: inf
-              _visible:
-                {}
           -
             id: b30
             type: integrator
@@ -377,8 +303,6 @@ blocks:
               initial: 0
               min: -inf
               max: inf
-              _visible:
-                {}
           -
             id: b32
             type: integrator
@@ -400,8 +324,6 @@ blocks:
             params:
               name: O2
               showNode: true
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b34
@@ -412,8 +334,6 @@ blocks:
             params:
               name: O3
               showNode: true
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b35
@@ -423,8 +343,6 @@ blocks:
             rotation: 0
             params:
               name: O1
-              _visible:
-                {}
           -
             id: b36
             type: labelSource
@@ -433,8 +351,6 @@ blocks:
             rotation: 0
             params:
               name: O2
-              _visible:
-                {}
           -
             id: b37
             type: labelSource
@@ -443,8 +359,6 @@ blocks:
             rotation: 0
             params:
               name: O3
-              _visible:
-                {}
           -
             id: b38
             type: labelSource
@@ -453,8 +367,6 @@ blocks:
             rotation: 0
             params:
               name: O2
-              _visible:
-                {}
           -
             id: b39
             type: labelSource
@@ -463,8 +375,6 @@ blocks:
             rotation: 0
             params:
               name: O3
-              _visible:
-                {}
           -
             id: b40
             type: labelSource
@@ -473,8 +383,6 @@ blocks:
             rotation: 0
             params:
               name: O1
-              _visible:
-                {}
           -
             id: b41
             type: labelSource
@@ -483,8 +391,6 @@ blocks:
             rotation: 0
             params:
               name: O2
-              _visible:
-                {}
           -
             id: b42
             type: labelSource
@@ -493,8 +399,6 @@ blocks:
             rotation: 0
             params:
               name: O3
-              _visible:
-                {}
           -
             id: b43
             type: labelSource
@@ -503,8 +407,6 @@ blocks:
             rotation: 0
             params:
               name: O1
-              _visible:
-                {}
         connections:
           -
             from: b1
@@ -781,8 +683,6 @@ blocks:
           -
             id: b34
             name: O3
-      _visible:
-        {}
   -
     id: b2
     type: subsystem
@@ -827,8 +727,6 @@ blocks:
               initial: 0
               min: -inf
               max: inf
-              _visible:
-                {}
           -
             id: b2
             type: integrator
@@ -848,12 +746,7 @@ blocks:
             y: 1380
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b4
             type: sum
@@ -861,12 +754,7 @@ blocks:
             y: 1380
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b5
             type: gain
@@ -875,8 +763,6 @@ blocks:
             rotation: 0
             params:
               gain: -6
-              _visible:
-                {}
           -
             id: b6
             type: labelSink
@@ -886,8 +772,6 @@ blocks:
             params:
               name: O1
               showNode: true
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b7
@@ -897,8 +781,6 @@ blocks:
             rotation: 0
             params:
               name: In-1
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b8
@@ -908,8 +790,6 @@ blocks:
             rotation: 0
             params:
               name: "In+2"
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b9
@@ -919,8 +799,6 @@ blocks:
             rotation: 0
             params:
               name: "In+1"
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b10
@@ -930,8 +808,6 @@ blocks:
             rotation: 0
             params:
               name: In-2
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b11
@@ -941,8 +817,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b12
             type: gain
@@ -951,8 +825,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b13
             type: gain
@@ -961,8 +833,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b14
             type: gain
@@ -971,8 +841,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b15
             type: gain
@@ -981,8 +849,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b16
             type: gain
@@ -991,8 +857,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b17
             type: gain
@@ -1001,8 +865,6 @@ blocks:
             rotation: 0
             params:
               gain: -6
-              _visible:
-                {}
           -
             id: b18
             type: gain
@@ -1011,8 +873,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b19
             type: gain
@@ -1021,8 +881,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b20
             type: gain
@@ -1031,8 +889,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b21
             type: gain
@@ -1041,8 +897,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b22
             type: gain
@@ -1051,8 +905,6 @@ blocks:
             rotation: 0
             params:
               gain: -6
-              _visible:
-                {}
           -
             id: b23
             type: gain
@@ -1061,8 +913,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b24
             type: gain
@@ -1071,8 +921,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b25
             type: sum
@@ -1080,12 +928,7 @@ blocks:
             y: 1860
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b26
             type: sum
@@ -1093,12 +936,7 @@ blocks:
             y: 2340
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b27
             type: sum
@@ -1106,12 +944,7 @@ blocks:
             y: 2340
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b28
             type: sum
@@ -1119,12 +952,7 @@ blocks:
             y: 1860
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b29
             type: integrator
@@ -1135,8 +963,6 @@ blocks:
               initial: 0
               min: -inf
               max: inf
-              _visible:
-                {}
           -
             id: b30
             type: integrator
@@ -1159,8 +985,6 @@ blocks:
               initial: 0
               min: -inf
               max: inf
-              _visible:
-                {}
           -
             id: b32
             type: integrator
@@ -1182,8 +1006,6 @@ blocks:
             params:
               name: O2
               showNode: true
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b34
@@ -1194,8 +1016,6 @@ blocks:
             params:
               name: O3
               showNode: true
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b35
@@ -1205,8 +1025,6 @@ blocks:
             rotation: 0
             params:
               name: O1
-              _visible:
-                {}
           -
             id: b36
             type: labelSource
@@ -1215,8 +1033,6 @@ blocks:
             rotation: 0
             params:
               name: O2
-              _visible:
-                {}
           -
             id: b37
             type: labelSource
@@ -1225,8 +1041,6 @@ blocks:
             rotation: 0
             params:
               name: O3
-              _visible:
-                {}
           -
             id: b38
             type: labelSource
@@ -1235,8 +1049,6 @@ blocks:
             rotation: 0
             params:
               name: O2
-              _visible:
-                {}
           -
             id: b39
             type: labelSource
@@ -1245,8 +1057,6 @@ blocks:
             rotation: 0
             params:
               name: O3
-              _visible:
-                {}
           -
             id: b40
             type: labelSource
@@ -1255,8 +1065,6 @@ blocks:
             rotation: 0
             params:
               name: O1
-              _visible:
-                {}
           -
             id: b41
             type: labelSource
@@ -1265,8 +1073,6 @@ blocks:
             rotation: 0
             params:
               name: O2
-              _visible:
-                {}
           -
             id: b42
             type: labelSource
@@ -1275,8 +1081,6 @@ blocks:
             rotation: 0
             params:
               name: O3
-              _visible:
-                {}
           -
             id: b43
             type: labelSource
@@ -1285,8 +1089,6 @@ blocks:
             rotation: 0
             params:
               name: O1
-              _visible:
-                {}
         connections:
           -
             from: b1
@@ -1563,8 +1365,6 @@ blocks:
           -
             id: b34
             name: O3
-      _visible:
-        {}
   -
     id: b3
     type: subsystem
@@ -1609,8 +1409,6 @@ blocks:
               initial: 0
               min: -inf
               max: inf
-              _visible:
-                {}
           -
             id: b2
             type: integrator
@@ -1630,12 +1428,7 @@ blocks:
             y: 1380
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b4
             type: sum
@@ -1643,12 +1436,7 @@ blocks:
             y: 1380
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b5
             type: gain
@@ -1657,8 +1445,6 @@ blocks:
             rotation: 0
             params:
               gain: -6
-              _visible:
-                {}
           -
             id: b6
             type: labelSink
@@ -1668,8 +1454,6 @@ blocks:
             params:
               name: O1
               showNode: true
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b7
@@ -1679,8 +1463,6 @@ blocks:
             rotation: 0
             params:
               name: In-1
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b8
@@ -1690,8 +1472,6 @@ blocks:
             rotation: 0
             params:
               name: "In+2"
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b9
@@ -1701,8 +1481,6 @@ blocks:
             rotation: 0
             params:
               name: "In+1"
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b10
@@ -1712,8 +1490,6 @@ blocks:
             rotation: 0
             params:
               name: In-2
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b11
@@ -1723,8 +1499,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b12
             type: gain
@@ -1733,8 +1507,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b13
             type: gain
@@ -1743,8 +1515,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b14
             type: gain
@@ -1753,8 +1523,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b15
             type: gain
@@ -1763,8 +1531,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b16
             type: gain
@@ -1773,8 +1539,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b17
             type: gain
@@ -1783,8 +1547,6 @@ blocks:
             rotation: 0
             params:
               gain: -6
-              _visible:
-                {}
           -
             id: b18
             type: gain
@@ -1793,8 +1555,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b19
             type: gain
@@ -1803,8 +1563,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b20
             type: gain
@@ -1813,8 +1571,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b21
             type: gain
@@ -1823,8 +1579,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b22
             type: gain
@@ -1833,8 +1587,6 @@ blocks:
             rotation: 0
             params:
               gain: -6
-              _visible:
-                {}
           -
             id: b23
             type: gain
@@ -1843,8 +1595,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b24
             type: gain
@@ -1853,8 +1603,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b25
             type: sum
@@ -1862,12 +1610,7 @@ blocks:
             y: 1860
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b26
             type: sum
@@ -1875,12 +1618,7 @@ blocks:
             y: 2340
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b27
             type: sum
@@ -1888,12 +1626,7 @@ blocks:
             y: 2340
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b28
             type: sum
@@ -1901,12 +1634,7 @@ blocks:
             y: 1860
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b29
             type: integrator
@@ -1917,8 +1645,6 @@ blocks:
               initial: 0
               min: -inf
               max: inf
-              _visible:
-                {}
           -
             id: b30
             type: integrator
@@ -1941,8 +1667,6 @@ blocks:
               initial: 0
               min: -inf
               max: inf
-              _visible:
-                {}
           -
             id: b32
             type: integrator
@@ -1964,8 +1688,6 @@ blocks:
             params:
               name: O2
               showNode: true
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b34
@@ -1976,8 +1698,6 @@ blocks:
             params:
               name: O3
               showNode: true
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b35
@@ -1987,8 +1707,6 @@ blocks:
             rotation: 0
             params:
               name: O1
-              _visible:
-                {}
           -
             id: b36
             type: labelSource
@@ -1997,8 +1715,6 @@ blocks:
             rotation: 0
             params:
               name: O2
-              _visible:
-                {}
           -
             id: b37
             type: labelSource
@@ -2007,8 +1723,6 @@ blocks:
             rotation: 0
             params:
               name: O3
-              _visible:
-                {}
           -
             id: b38
             type: labelSource
@@ -2017,8 +1731,6 @@ blocks:
             rotation: 0
             params:
               name: O2
-              _visible:
-                {}
           -
             id: b39
             type: labelSource
@@ -2027,8 +1739,6 @@ blocks:
             rotation: 0
             params:
               name: O3
-              _visible:
-                {}
           -
             id: b40
             type: labelSource
@@ -2037,8 +1747,6 @@ blocks:
             rotation: 0
             params:
               name: O1
-              _visible:
-                {}
           -
             id: b41
             type: labelSource
@@ -2047,8 +1755,6 @@ blocks:
             rotation: 0
             params:
               name: O2
-              _visible:
-                {}
           -
             id: b42
             type: labelSource
@@ -2057,8 +1763,6 @@ blocks:
             rotation: 0
             params:
               name: O3
-              _visible:
-                {}
           -
             id: b43
             type: labelSource
@@ -2067,8 +1771,6 @@ blocks:
             rotation: 0
             params:
               name: O1
-              _visible:
-                {}
         connections:
           -
             from: b1
@@ -2345,8 +2047,6 @@ blocks:
           -
             id: b34
             name: O3
-      _visible:
-        {}
   -
     id: b4
     type: subsystem
@@ -2391,8 +2091,6 @@ blocks:
               initial: 0
               min: -inf
               max: inf
-              _visible:
-                {}
           -
             id: b2
             type: integrator
@@ -2412,12 +2110,7 @@ blocks:
             y: 1380
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b4
             type: sum
@@ -2425,12 +2118,7 @@ blocks:
             y: 1380
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b5
             type: gain
@@ -2439,8 +2127,6 @@ blocks:
             rotation: 0
             params:
               gain: -6
-              _visible:
-                {}
           -
             id: b6
             type: labelSink
@@ -2450,8 +2136,6 @@ blocks:
             params:
               name: O1
               showNode: true
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b7
@@ -2461,8 +2145,6 @@ blocks:
             rotation: 0
             params:
               name: In-1
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b8
@@ -2472,8 +2154,6 @@ blocks:
             rotation: 0
             params:
               name: "In+2"
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b9
@@ -2483,8 +2163,6 @@ blocks:
             rotation: 0
             params:
               name: "In+1"
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b10
@@ -2494,8 +2172,6 @@ blocks:
             rotation: 0
             params:
               name: In-2
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b11
@@ -2505,8 +2181,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b12
             type: gain
@@ -2515,8 +2189,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b13
             type: gain
@@ -2525,8 +2197,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b14
             type: gain
@@ -2535,8 +2205,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b15
             type: gain
@@ -2545,8 +2213,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b16
             type: gain
@@ -2555,8 +2221,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b17
             type: gain
@@ -2565,8 +2229,6 @@ blocks:
             rotation: 0
             params:
               gain: -6
-              _visible:
-                {}
           -
             id: b18
             type: gain
@@ -2575,8 +2237,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b19
             type: gain
@@ -2585,8 +2245,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b20
             type: gain
@@ -2595,8 +2253,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b21
             type: gain
@@ -2605,8 +2261,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b22
             type: gain
@@ -2615,8 +2269,6 @@ blocks:
             rotation: 0
             params:
               gain: -6
-              _visible:
-                {}
           -
             id: b23
             type: gain
@@ -2625,8 +2277,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b24
             type: gain
@@ -2635,8 +2285,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b25
             type: sum
@@ -2644,12 +2292,7 @@ blocks:
             y: 1860
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b26
             type: sum
@@ -2657,12 +2300,7 @@ blocks:
             y: 2340
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b27
             type: sum
@@ -2670,12 +2308,7 @@ blocks:
             y: 2340
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b28
             type: sum
@@ -2683,12 +2316,7 @@ blocks:
             y: 1860
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b29
             type: integrator
@@ -2699,8 +2327,6 @@ blocks:
               initial: 0
               min: -inf
               max: inf
-              _visible:
-                {}
           -
             id: b30
             type: integrator
@@ -2723,8 +2349,6 @@ blocks:
               initial: 0
               min: -inf
               max: inf
-              _visible:
-                {}
           -
             id: b32
             type: integrator
@@ -2746,8 +2370,6 @@ blocks:
             params:
               name: O2
               showNode: true
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b34
@@ -2758,8 +2380,6 @@ blocks:
             params:
               name: O3
               showNode: true
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b35
@@ -2769,8 +2389,6 @@ blocks:
             rotation: 0
             params:
               name: O1
-              _visible:
-                {}
           -
             id: b36
             type: labelSource
@@ -2779,8 +2397,6 @@ blocks:
             rotation: 0
             params:
               name: O2
-              _visible:
-                {}
           -
             id: b37
             type: labelSource
@@ -2789,8 +2405,6 @@ blocks:
             rotation: 0
             params:
               name: O3
-              _visible:
-                {}
           -
             id: b38
             type: labelSource
@@ -2799,8 +2413,6 @@ blocks:
             rotation: 0
             params:
               name: O2
-              _visible:
-                {}
           -
             id: b39
             type: labelSource
@@ -2809,8 +2421,6 @@ blocks:
             rotation: 0
             params:
               name: O3
-              _visible:
-                {}
           -
             id: b40
             type: labelSource
@@ -2819,8 +2429,6 @@ blocks:
             rotation: 0
             params:
               name: O1
-              _visible:
-                {}
           -
             id: b41
             type: labelSource
@@ -2829,8 +2437,6 @@ blocks:
             rotation: 0
             params:
               name: O2
-              _visible:
-                {}
           -
             id: b42
             type: labelSource
@@ -2839,8 +2445,6 @@ blocks:
             rotation: 0
             params:
               name: O3
-              _visible:
-                {}
           -
             id: b43
             type: labelSource
@@ -2849,8 +2453,6 @@ blocks:
             rotation: 0
             params:
               name: O1
-              _visible:
-                {}
         connections:
           -
             from: b1
@@ -3127,8 +2729,6 @@ blocks:
           -
             id: b34
             name: O3
-      _visible:
-        {}
   -
     id: b5
     type: subsystem
@@ -3173,8 +2773,6 @@ blocks:
               initial: 0
               min: -inf
               max: inf
-              _visible:
-                {}
           -
             id: b2
             type: integrator
@@ -3194,12 +2792,7 @@ blocks:
             y: 1380
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b4
             type: sum
@@ -3207,12 +2800,7 @@ blocks:
             y: 1380
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b5
             type: gain
@@ -3221,8 +2809,6 @@ blocks:
             rotation: 0
             params:
               gain: -6
-              _visible:
-                {}
           -
             id: b6
             type: labelSink
@@ -3232,8 +2818,6 @@ blocks:
             params:
               name: O1
               showNode: true
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b7
@@ -3243,8 +2827,6 @@ blocks:
             rotation: 0
             params:
               name: In-1
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b8
@@ -3254,8 +2836,6 @@ blocks:
             rotation: 0
             params:
               name: "In+2"
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b9
@@ -3265,8 +2845,6 @@ blocks:
             rotation: 0
             params:
               name: "In+1"
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b10
@@ -3276,8 +2854,6 @@ blocks:
             rotation: 0
             params:
               name: In-2
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b11
@@ -3287,8 +2863,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b12
             type: gain
@@ -3297,8 +2871,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b13
             type: gain
@@ -3307,8 +2879,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b14
             type: gain
@@ -3317,8 +2887,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b15
             type: gain
@@ -3327,8 +2895,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b16
             type: gain
@@ -3337,8 +2903,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b17
             type: gain
@@ -3347,8 +2911,6 @@ blocks:
             rotation: 0
             params:
               gain: -6
-              _visible:
-                {}
           -
             id: b18
             type: gain
@@ -3357,8 +2919,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b19
             type: gain
@@ -3367,8 +2927,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b20
             type: gain
@@ -3377,8 +2935,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b21
             type: gain
@@ -3387,8 +2943,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b22
             type: gain
@@ -3397,8 +2951,6 @@ blocks:
             rotation: 0
             params:
               gain: -6
-              _visible:
-                {}
           -
             id: b23
             type: gain
@@ -3407,8 +2959,6 @@ blocks:
             rotation: 0
             params:
               gain: 4
-              _visible:
-                {}
           -
             id: b24
             type: gain
@@ -3417,8 +2967,6 @@ blocks:
             rotation: 0
             params:
               gain: -1
-              _visible:
-                {}
           -
             id: b25
             type: sum
@@ -3426,12 +2974,7 @@ blocks:
             y: 1860
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b26
             type: sum
@@ -3439,12 +2982,7 @@ blocks:
             y: 2340
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b27
             type: sum
@@ -3452,12 +2990,7 @@ blocks:
             y: 2340
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b28
             type: sum
@@ -3465,12 +2998,7 @@ blocks:
             y: 1860
             rotation: 0
             params:
-              signs:
-                - 1
-                - 1
-                - 1
-              _visible:
-                {}
+              signs: [1,1,1]
           -
             id: b29
             type: integrator
@@ -3481,8 +3009,6 @@ blocks:
               initial: 0
               min: -inf
               max: inf
-              _visible:
-                {}
           -
             id: b30
             type: integrator
@@ -3505,8 +3031,6 @@ blocks:
               initial: 0
               min: -inf
               max: inf
-              _visible:
-                {}
           -
             id: b32
             type: integrator
@@ -3528,8 +3052,6 @@ blocks:
             params:
               name: O2
               showNode: true
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b34
@@ -3540,8 +3062,6 @@ blocks:
             params:
               name: O3
               showNode: true
-              _visible:
-                {}
               isExternalPort: true
           -
             id: b35
@@ -3551,8 +3071,6 @@ blocks:
             rotation: 0
             params:
               name: O1
-              _visible:
-                {}
           -
             id: b36
             type: labelSource
@@ -3561,8 +3079,6 @@ blocks:
             rotation: 0
             params:
               name: O2
-              _visible:
-                {}
           -
             id: b37
             type: labelSource
@@ -3571,8 +3087,6 @@ blocks:
             rotation: 0
             params:
               name: O3
-              _visible:
-                {}
           -
             id: b38
             type: labelSource
@@ -3581,8 +3095,6 @@ blocks:
             rotation: 0
             params:
               name: O2
-              _visible:
-                {}
           -
             id: b39
             type: labelSource
@@ -3591,8 +3103,6 @@ blocks:
             rotation: 0
             params:
               name: O3
-              _visible:
-                {}
           -
             id: b40
             type: labelSource
@@ -3601,8 +3111,6 @@ blocks:
             rotation: 0
             params:
               name: O1
-              _visible:
-                {}
           -
             id: b41
             type: labelSource
@@ -3611,8 +3119,6 @@ blocks:
             rotation: 0
             params:
               name: O2
-              _visible:
-                {}
           -
             id: b42
             type: labelSource
@@ -3621,8 +3127,6 @@ blocks:
             rotation: 0
             params:
               name: O3
-              _visible:
-                {}
           -
             id: b43
             type: labelSource
@@ -3631,8 +3135,6 @@ blocks:
             rotation: 0
             params:
               name: O1
-              _visible:
-                {}
         connections:
           -
             from: b1
@@ -3909,8 +3411,6 @@ blocks:
           -
             id: b34
             name: O3
-      _visible:
-        {}
   -
     id: b6
     type: scope
@@ -3941,8 +3441,6 @@ blocks:
       width: 300
       height: 200
       showTickLabels: false
-      _visible:
-        {}
   -
     id: b8
     type: scope
@@ -3957,8 +3455,6 @@ blocks:
       width: 300
       height: 200
       showTickLabels: false
-      _visible:
-        {}
   -
     id: b9
     type: scope
@@ -3973,8 +3469,6 @@ blocks:
       width: 300
       height: 200
       showTickLabels: false
-      _visible:
-        {}
   -
     id: b10
     type: scope
@@ -3989,8 +3483,6 @@ blocks:
       width: 300
       height: 200
       showTickLabels: false
-      _visible:
-        {}
   -
     id: b11
     type: constant
@@ -3999,8 +3491,6 @@ blocks:
     rotation: 0
     params:
       value: 0
-      _visible:
-        {}
   -
     id: b12
     type: sum
@@ -4008,12 +3498,7 @@ blocks:
     y: 2270
     rotation: 0
     params:
-      signs:
-        - 1
-        - 1
-        - 1
-      _visible:
-        {}
+      signs: [1,1,1]
   -
     id: b13
     type: sum
@@ -4021,12 +3506,7 @@ blocks:
     y: 2320
     rotation: 0
     params:
-      signs:
-        - 1
-        - 1
-        - 1
-      _visible:
-        {}
+      signs: [1,1,1]
   -
     id: b14
     type: gain
@@ -4035,8 +3515,6 @@ blocks:
     rotation: 180
     params:
       gain: 3
-      _visible:
-        {}
   -
     id: b15
     type: gain
@@ -4045,8 +3523,6 @@ blocks:
     rotation: 180
     params:
       gain: 2
-      _visible:
-        {}
   -
     id: b16
     type: gain
@@ -4055,8 +3531,6 @@ blocks:
     rotation: 90
     params:
       gain: -2
-      _visible:
-        {}
   -
     id: b17
     type: gain
@@ -4065,8 +3539,6 @@ blocks:
     rotation: 90
     params:
       gain: -1
-      _visible:
-        {}
 connections:
   -
     from: b1

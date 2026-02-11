@@ -24,10 +24,7 @@ blocks:
     y: 1600
     rotation: 0
     params:
-      signs:
-        - 1
-        - 1
-        - 1
+      signs: [1,1,1]
   -
     id: b8
     type: tf
@@ -35,12 +32,8 @@ blocks:
     y: 1570
     rotation: 0
     params:
-      num:
-        - 1
-      den:
-        - 1
-        - 3
-        - 1
+      num: [1]
+      den: [1,3,1]
   -
     id: b9
     type: saturation
@@ -57,10 +50,7 @@ blocks:
     y: 1730
     rotation: 90
     params:
-      signs:
-        - 1
-        - 1
-        - -1
+      signs: [1,1,-1]
   -
     id: b11
     type: scope
@@ -89,10 +79,7 @@ blocks:
     y: 1600
     rotation: 0
     params:
-      signs:
-        - 1
-        - 1
-        - -1
+      signs: [1,1,-1]
   -
     id: b15
     type: sum
@@ -100,10 +87,7 @@ blocks:
     y: 1730
     rotation: 0
     params:
-      signs:
-        - 1
-        - 1
-        - 1
+      signs: [1,1,1]
   -
     id: b16
     type: integrator

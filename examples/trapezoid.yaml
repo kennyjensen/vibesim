@@ -10,8 +10,6 @@ blocks:
     params:
       condition: gt
       threshold: 0
-      _visible:
-        {}
   -
     id: b2
     type: constant
@@ -20,8 +18,6 @@ blocks:
     rotation: 0
     params:
       value: 1
-      _visible:
-        {}
   -
     id: b3
     type: constant
@@ -30,8 +26,6 @@ blocks:
     rotation: 0
     params:
       value: -1
-      _visible:
-        {}
   -
     id: b4
     type: scope
@@ -57,12 +51,7 @@ blocks:
     y: 1600
     rotation: 0
     params:
-      signs:
-        - 1
-        - 1
-        - 1
-      _visible:
-        {}
+      signs: [1,1,1]
   -
     id: b7
     type: sum
@@ -70,12 +59,7 @@ blocks:
     y: 1600
     rotation: 0
     params:
-      signs:
-        - 1
-        - 1
-        - 1
-      _visible:
-        {}
+      signs: [1,1,1]
   -
     id: b8
     type: gain
@@ -84,8 +68,6 @@ blocks:
     rotation: 0
     params:
       gain: -1
-      _visible:
-        {}
   -
     id: b9
     type: integrator
@@ -106,8 +88,6 @@ blocks:
     rotation: 0
     params:
       value: -1
-      _visible:
-        {}
   -
     id: b11
     type: constant
@@ -116,8 +96,6 @@ blocks:
     rotation: 0
     params:
       value: 1
-      _visible:
-        {}
   -
     id: b12
     type: sum
@@ -125,12 +103,7 @@ blocks:
     y: 1380
     rotation: 0
     params:
-      signs:
-        - 1
-        - 1
-        - 1
-      _visible:
-        {}
+      signs: [1,1,1]
   -
     id: b13
     type: switch
@@ -140,8 +113,6 @@ blocks:
     params:
       condition: gt
       threshold: 0
-      _visible:
-        {}
   -
     id: b14
     type: sum
@@ -149,12 +120,7 @@ blocks:
     y: 1380
     rotation: 0
     params:
-      signs:
-        - 1
-        - 1
-        - 1
-      _visible:
-        {}
+      signs: [1,1,1]
   -
     id: b15
     type: gain
@@ -163,8 +129,6 @@ blocks:
     rotation: 0
     params:
       gain: -1
-      _visible:
-        {}
   -
     id: b16
     type: integrator
@@ -185,8 +149,6 @@ blocks:
     rotation: 0
     params:
       gain: -1
-      _visible:
-        {}
   -
     id: b18
     type: constant
@@ -195,8 +157,6 @@ blocks:
     rotation: 0
     params:
       value: 1
-      _visible:
-        {}
   -
     id: b19
     type: constant
@@ -205,8 +165,6 @@ blocks:
     rotation: 0
     params:
       value: -1
-      _visible:
-        {}
   -
     id: b20
     type: sum
@@ -214,12 +172,7 @@ blocks:
     y: 1820
     rotation: 0
     params:
-      signs:
-        - 1
-        - 1
-        - 1
-      _visible:
-        {}
+      signs: [1,1,1]
   -
     id: b21
     type: switch
@@ -229,8 +182,6 @@ blocks:
     params:
       condition: gt
       threshold: 0
-      _visible:
-        {}
   -
     id: b22
     type: sum
@@ -238,12 +189,7 @@ blocks:
     y: 1820
     rotation: 0
     params:
-      signs:
-        - 1
-        - 1
-        - 1
-      _visible:
-        {}
+      signs: [1,1,1]
   -
     id: b23
     type: integrator
@@ -283,8 +229,6 @@ blocks:
     params:
       name: A
       showNode: true
-      _visible:
-        {}
   -
     id: b26
     type: labelSource
@@ -293,8 +237,6 @@ blocks:
     rotation: 0
     params:
       name: A
-      _visible:
-        {}
   -
     id: b27
     type: labelSource
@@ -303,8 +245,6 @@ blocks:
     rotation: 0
     params:
       name: B
-      _visible:
-        {}
   -
     id: b28
     type: labelSource
@@ -313,8 +253,6 @@ blocks:
     rotation: 0
     params:
       name: C
-      _visible:
-        {}
   -
     id: b29
     type: labelSource
@@ -323,8 +261,6 @@ blocks:
     rotation: 0
     params:
       name: R
-      _visible:
-        {}
   -
     id: b30
     type: labelSource
@@ -333,8 +269,6 @@ blocks:
     rotation: 0
     params:
       name: S
-      _visible:
-        {}
   -
     id: b31
     type: labelSource
@@ -343,8 +277,6 @@ blocks:
     rotation: 0
     params:
       name: T
-      _visible:
-        {}
   -
     id: b32
     type: labelSink
@@ -354,8 +286,6 @@ blocks:
     params:
       name: R
       showNode: true
-      _visible:
-        {}
   -
     id: b33
     type: labelSink
@@ -365,8 +295,6 @@ blocks:
     params:
       name: S
       showNode: true
-      _visible:
-        {}
   -
     id: b34
     type: labelSink
@@ -376,8 +304,6 @@ blocks:
     params:
       name: T
       showNode: true
-      _visible:
-        {}
   -
     id: b35
     type: labelSink
@@ -387,8 +313,6 @@ blocks:
     params:
       name: C
       showNode: true
-      _visible:
-        {}
   -
     id: b36
     type: labelSink
@@ -398,8 +322,6 @@ blocks:
     params:
       name: B
       showNode: true
-      _visible:
-        {}
   -
     id: b37
     type: labelSink
@@ -409,8 +331,6 @@ blocks:
     params:
       name: F
       showNode: true
-      _visible:
-        {}
   -
     id: b38
     type: labelSink
@@ -420,8 +340,6 @@ blocks:
     params:
       name: D
       showNode: true
-      _visible:
-        {}
   -
     id: b39
     type: labelSink
@@ -431,8 +349,6 @@ blocks:
     params:
       name: E
       showNode: true
-      _visible:
-        {}
   -
     id: b40
     type: scope
@@ -459,8 +375,6 @@ blocks:
     rotation: 0
     params:
       name: D
-      _visible:
-        {}
   -
     id: b42
     type: labelSource
@@ -469,8 +383,6 @@ blocks:
     rotation: 0
     params:
       name: F
-      _visible:
-        {}
   -
     id: b43
     type: labelSource
@@ -479,8 +391,6 @@ blocks:
     rotation: 0
     params:
       name: E
-      _visible:
-        {}
 connections:
   -
     from: b2
