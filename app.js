@@ -17,6 +17,7 @@ const wireLayer = document.getElementById("wireLayer");
 const overlayLayer = document.getElementById("overlayLayer");
 const runBtn = document.getElementById("runBtn");
 const runButtons = document.querySelectorAll('[data-action="run"]');
+const resetSimBtn = document.getElementById("resetSimBtn");
 const clearBtn = document.getElementById("clearBtn");
 const saveBtn = document.getElementById("saveBtn");
 const loadBtn = document.getElementById("loadBtn");
@@ -148,6 +149,8 @@ const state = {
   subsystemStack: [],
   routeEpoch: 0,
   spawnIndex: 0,
+  simSession: null,
+  pauseRequested: false,
 };
 
 let fitToDiagram = () => {};
@@ -601,6 +604,8 @@ const parseVariables = (text) => {
 
 
 function clearWorkspace() {
+  state.simSession = null;
+  state.pauseRequested = false;
   renderer.clearWorkspace();
   state.spawnIndex = 0;
   statusEl.textContent = "Idle";
@@ -664,6 +669,8 @@ function serializeDiagram(state) {
 }
 
 function loadDiagram(data, options = {}) {
+  state.simSession = null;
+  state.pauseRequested = false;
   state.routeEpoch = (Number(state.routeEpoch) || 0) + 1;
   const preserveSubsystemStack = Boolean(options?.preserveSubsystemStack);
   const restoreUiState = options?.restoreUiState && typeof options.restoreUiState === "object"
@@ -1567,26 +1574,97 @@ function init() {
   }
 
   let runInProgress = false;
-  const setRunButtonsDisabled = (disabled) => {
-    if (runButtons.length) {
-      runButtons.forEach((button) => {
-        button.disabled = disabled;
-      });
-    } else if (runBtn) {
-      runBtn.disabled = disabled;
-    }
+  const clearSimulationOutputs = () => {
+    const hasIncoming = (blockId, inputIndex) =>
+      state.connections.some(
+        (conn) => conn.to === blockId && Number(conn.toIndex ?? 0) === Number(inputIndex)
+      );
+    state.blocks.forEach((block) => {
+      if (block.type === "scope") {
+        const connected = Array.from({ length: block.inputs }, (_, idx) => hasIncoming(block.id, idx));
+        const series = Array.from({ length: block.inputs }, () => []);
+        block.scopeData = { time: [], series, connected };
+        renderScope(block);
+      } else if (block.type === "xyScope") {
+        const connected = [hasIncoming(block.id, 0), hasIncoming(block.id, 1)];
+        block.xyScopeData = { series: { x: [], y: [] }, connected };
+        renderScope(block);
+      } else if (block.type === "fileSink" && block.params) {
+        block.params.lastCsv = "";
+      }
+    });
+  };
+  const setRunButtonsMode = (running) => {
+    const label = running ? "Pause" : "Run";
+    const aria = running ? "Pause" : "Run";
+    const title = running ? "Pause" : "Run";
+    const iconPath = running ? "M7 5h4v14H7zM13 5h4v14h-4z" : "M7 5l12 7-12 7z";
+    const targets = runButtons.length ? Array.from(runButtons) : (runBtn ? [runBtn] : []);
+    targets.forEach((button) => {
+      if (!(button instanceof HTMLElement)) return;
+      button.setAttribute("aria-label", aria);
+      button.setAttribute("title", title);
+      if (button.classList.contains("sim-run")) {
+        button.textContent = label;
+      }
+      const path = button.querySelector("svg path");
+      if (path) path.setAttribute("d", iconPath);
+    });
   };
   const handleRun = async () => {
-    if (runInProgress) return;
+    if (runInProgress) {
+      state.pauseRequested = true;
+      if (statusEl) statusEl.textContent = "Pausing...";
+      return;
+    }
     runInProgress = true;
-    setRunButtonsDisabled(true);
+    state.pauseRequested = false;
+    setRunButtonsMode(true);
     try {
-      await simulate({ state, runtimeInput, statusEl, downloadFile });
+      const result = await simulate({
+        state,
+        runtimeInput,
+        statusEl,
+        downloadFile,
+        session: state.simSession || null,
+        control: {
+          get pauseRequested() {
+            return state.pauseRequested === true;
+          },
+        },
+      });
+      if (result?.status === "paused") {
+        state.simSession = result.session || null;
+      } else {
+        state.simSession = null;
+      }
     } finally {
       runInProgress = false;
-      setRunButtonsDisabled(false);
+      state.pauseRequested = false;
+      setRunButtonsMode(false);
     }
   };
+  const waitForRunToStop = async () => {
+    while (runInProgress) {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+  };
+  const handleReset = async () => {
+    if (runInProgress) {
+      state.pauseRequested = true;
+      if (statusEl) statusEl.textContent = "Pausing...";
+      await waitForRunToStop();
+    }
+    state.simSession = null;
+    state.pauseRequested = false;
+    clearSimulationOutputs();
+    if (statusEl) statusEl.textContent = "Reset";
+    const selected = state.selectedId ? state.blocks.get(state.selectedId) : null;
+    if (selected && (selected.type === "scope" || selected.type === "xyScope")) {
+      renderInspector(selected);
+    }
+  };
+  setRunButtonsMode(false);
   const refreshSelectedScopeInspector = () => {
     const selected = state.selectedId ? state.blocks.get(state.selectedId) : null;
     if (!selected || (selected.type !== "scope" && selected.type !== "xyScope")) return;
@@ -1628,6 +1706,11 @@ function init() {
     runButtons.forEach((button) => button.addEventListener("click", handleRun));
   } else if (runBtn) {
     runBtn.addEventListener("click", handleRun);
+  }
+  if (resetSimBtn) {
+    resetSimBtn.addEventListener("click", () => {
+      handleReset();
+    });
   }
 
   if (codegenBtn) {

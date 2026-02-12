@@ -63,95 +63,120 @@ function buildAlgebraicPlan(algebraicBlocks, inputMap) {
   return { ordered: hasCycle ? algebraicBlocks : ordered, hasCycle };
 }
 
-export async function simulate({ state, runtimeInput, statusEl, downloadFile }) {
-  statusEl.textContent = "Running...";
-  const blocks = Array.from(state.blocks.values());
-  const blockHandlers = blocks.map((block) => ({ block, handler: simHandlers[block.type] }));
-  const initBlocks = blockHandlers.filter(({ handler }) => Boolean(handler?.init));
-  const outputBlocks = blockHandlers.filter(({ handler }) => Boolean(handler?.output));
-  const algebraicBlocks = blockHandlers.filter(({ handler }) => Boolean(handler?.algebraic));
-  const afterStepBlocks = blockHandlers.filter(({ handler }) => Boolean(handler?.afterStep));
-  const updateBlocks = blockHandlers.filter(({ handler }) => Boolean(handler?.update));
-  const finalizeBlocks = blockHandlers.filter(({ handler }) => Boolean(handler?.finalize));
-  const hasLabelResolution = blocks.some((b) => b.type === "labelSource" || b.type === "labelSink");
-  const labelSourceBlocks = hasLabelResolution ? blocks.filter((b) => b.type === "labelSource") : [];
-  const needsAlgebraicSolve = hasLabelResolution || algebraicBlocks.length > 0;
-  const scopes = blocks.filter((b) => b.type === "scope");
-  const xyScopes = blocks.filter((b) => b.type === "xyScope");
-  const fileSinks = blocks.filter((b) => b.type === "fileSink");
+export async function simulate({ state, runtimeInput, statusEl, downloadFile, session = null, control = null }) {
+  let run = session;
+  if (!run) {
+    const blocks = Array.from(state.blocks.values());
+    const blockHandlers = blocks.map((block) => ({ block, handler: simHandlers[block.type] }));
+    const initBlocks = blockHandlers.filter(({ handler }) => Boolean(handler?.init));
+    const outputBlocks = blockHandlers.filter(({ handler }) => Boolean(handler?.output));
+    const algebraicBlocks = blockHandlers.filter(({ handler }) => Boolean(handler?.algebraic));
+    const afterStepBlocks = blockHandlers.filter(({ handler }) => Boolean(handler?.afterStep));
+    const updateBlocks = blockHandlers.filter(({ handler }) => Boolean(handler?.update));
+    const finalizeBlocks = blockHandlers.filter(({ handler }) => Boolean(handler?.finalize));
+    const hasLabelResolution = blocks.some((b) => b.type === "labelSource" || b.type === "labelSink");
+    const labelSourceBlocks = hasLabelResolution ? blocks.filter((b) => b.type === "labelSource") : [];
+    const needsAlgebraicSolve = hasLabelResolution || algebraicBlocks.length > 0;
+    const scopes = blocks.filter((b) => b.type === "scope");
+    const xyScopes = blocks.filter((b) => b.type === "xyScope");
+    const fileSinks = blocks.filter((b) => b.type === "fileSink");
 
-  if (scopes.length === 0 && xyScopes.length === 0 && fileSinks.length === 0) {
-    statusEl.textContent = "Add a Scope block";
-    return;
+    if (scopes.length === 0 && xyScopes.length === 0 && fileSinks.length === 0) {
+      statusEl.textContent = "Add a Scope block";
+      return { status: "error", reason: "no_scope", session: null };
+    }
+
+    const inputMap = new Map();
+    const variables = state.variables || { pi: Math.PI, e: Math.E };
+    const resolveParam = (value, block, key) => {
+      if (block.type === "labelSource" || block.type === "labelSink") {
+        if (key === "name" || key === "isExternalPort") return value;
+      }
+      if (block.type === "userFunc" && key === "expr") return value;
+      if (block.type === "fileSource" || block.type === "fileSink") {
+        if (key === "path" || key === "times" || key === "values" || key === "lastCsv") return value;
+      }
+      if (block.type === "switch" && key === "condition") return value;
+      if (block.type === "subsystem" && (key === "name" || key === "externalInputs" || key === "externalOutputs" || key === "subsystem")) return value;
+      if (key === "signs") return value;
+      if (Array.isArray(value)) return value.map((v) => {
+        const out = evalExpression(v, variables);
+        return Number.isNaN(out) ? 0 : out;
+      });
+      const out = evalExpression(value, variables);
+      return Number.isNaN(out) ? 0 : out;
+    };
+    const resolvedParams = new Map();
+    blocks.forEach((block) => {
+      const params = block.params || {};
+      const resolved = {};
+      Object.entries(params).forEach(([key, value]) => {
+        resolved[key] = resolveParam(value, block, key);
+      });
+      resolvedParams.set(block.id, resolved);
+    });
+    blocks.forEach((block) => {
+      inputMap.set(block.id, Array(block.inputs).fill(null));
+    });
+
+    const sourceKey = (fromId, fromIndex) => {
+      const idx = Number(fromIndex ?? 0);
+      return idx > 0 ? `${fromId}:${idx}` : fromId;
+    };
+
+    state.connections.forEach((conn) => {
+      const inputs = inputMap.get(conn.to);
+      if (!inputs) return;
+      if (conn.toIndex < inputs.length) inputs[conn.toIndex] = sourceKey(conn.from, conn.fromIndex);
+    });
+    const algebraicPlan = buildAlgebraicPlan(algebraicBlocks, inputMap);
+
+    const dt = Math.max(1e-6, Number(state.sampleTime ?? variables.dt ?? variables.sampleTime ?? 0.01) || 0.01);
+    const requestedDuration = Number(runtimeInput.value);
+    const baseDuration = Number.isFinite(requestedDuration) && requestedDuration >= 0 ? requestedDuration : 10;
+    const minDuration = dt * 10;
+    const duration = Math.max(baseDuration, minDuration);
+    const samples = Math.floor(duration / dt);
+    const time = [];
+    const blockState = new Map();
+    const labelSinks = new Map();
+    const ctx = {
+      resolvedParams,
+      inputMap,
+      labelSinks,
+      blockState,
+      dt,
+      variables,
+    };
+
+    initBlocks.forEach(({ block, handler }) => handler.init(ctx, block));
+    run = {
+      state,
+      blockHandlers,
+      outputBlocks,
+      afterStepBlocks,
+      updateBlocks,
+      finalizeBlocks,
+      algebraicPlan,
+      hasLabelResolution,
+      needsAlgebraicSolve,
+      labelSourceBlocks,
+      scopes,
+      xyScopes,
+      fileSinks,
+      dt,
+      samples,
+      time,
+      blockState,
+      labelSinks,
+      ctx,
+      nextStep: 0,
+      algebraicLoopFailed: false,
+      algebraicLoopTime: 0,
+    };
   }
 
-  const inputMap = new Map();
-  const variables = state.variables || { pi: Math.PI, e: Math.E };
-  const resolveParam = (value, block, key) => {
-    if (block.type === "labelSource" || block.type === "labelSink") {
-      if (key === "name" || key === "isExternalPort") return value;
-    }
-    if (block.type === "userFunc" && key === "expr") return value;
-    if (block.type === "fileSource" || block.type === "fileSink") {
-      if (key === "path" || key === "times" || key === "values" || key === "lastCsv") return value;
-    }
-    if (block.type === "switch" && key === "condition") return value;
-    if (block.type === "subsystem" && (key === "name" || key === "externalInputs" || key === "externalOutputs" || key === "subsystem")) return value;
-    if (key === "signs") return value;
-    if (Array.isArray(value)) return value.map((v) => {
-      const out = evalExpression(v, variables);
-      return Number.isNaN(out) ? 0 : out;
-    });
-    const out = evalExpression(value, variables);
-    return Number.isNaN(out) ? 0 : out;
-  };
-  const resolvedParams = new Map();
-  blocks.forEach((block) => {
-    const params = block.params || {};
-    const resolved = {};
-    Object.entries(params).forEach(([key, value]) => {
-      resolved[key] = resolveParam(value, block, key);
-    });
-    resolvedParams.set(block.id, resolved);
-  });
-  blocks.forEach((block) => {
-    inputMap.set(block.id, Array(block.inputs).fill(null));
-  });
-
-  const sourceKey = (fromId, fromIndex) => {
-    const idx = Number(fromIndex ?? 0);
-    return idx > 0 ? `${fromId}:${idx}` : fromId;
-  };
-
-  state.connections.forEach((conn) => {
-    const inputs = inputMap.get(conn.to);
-    if (!inputs) return;
-    if (conn.toIndex < inputs.length) inputs[conn.toIndex] = sourceKey(conn.from, conn.fromIndex);
-  });
-  const algebraicPlan = buildAlgebraicPlan(algebraicBlocks, inputMap);
-
-  const dt = Math.max(1e-6, Number(state.sampleTime ?? variables.dt ?? variables.sampleTime ?? 0.01) || 0.01);
-  const requestedDuration = Number(runtimeInput.value);
-  const baseDuration = Number.isFinite(requestedDuration) && requestedDuration >= 0 ? requestedDuration : 10;
-  const minDuration = dt * 10;
-  const duration = Math.max(baseDuration, minDuration);
-  const samples = Math.floor(duration / dt);
-  const time = [];
-  const blockState = new Map();
-  const labelSinks = new Map();
-  const ctx = {
-    resolvedParams,
-    inputMap,
-    labelSinks,
-    blockState,
-    dt,
-    variables,
-  };
-
-  initBlocks.forEach(({ block, handler }) => handler.init(ctx, block));
-
-  let algebraicLoopFailed = false;
-  let algebraicLoopTime = 0;
+  statusEl.textContent = "Running...";
   const canProgressiveRun =
     typeof window !== "undefined" &&
     typeof window.requestAnimationFrame === "function" &&
@@ -160,21 +185,21 @@ export async function simulate({ state, runtimeInput, statusEl, downloadFile }) 
   const chunkSize = 250;
 
   const runStep = (i) => {
-    const t = i * dt;
-    time.push(t);
+    const t = i * run.dt;
+    run.time.push(t);
     const outputs = new Map();
-    ctx.t = t;
-    ctx.outputs = outputs;
+    run.ctx.t = t;
+    run.ctx.outputs = outputs;
 
-    outputBlocks.forEach(({ block, handler }) => handler.output(ctx, block));
+    run.outputBlocks.forEach(({ block, handler }) => handler.output(run.ctx, block));
 
     const resolveLabelSources = () =>
-      resolveLabelSourcesOnce(labelSourceBlocks, outputs, inputMap, labelSinks);
+      resolveLabelSourcesOnce(run.labelSourceBlocks, outputs, run.ctx.inputMap, run.labelSinks);
 
-    if (needsAlgebraicSolve) {
-      if (!hasLabelResolution && !algebraicPlan.hasCycle) {
-        algebraicPlan.ordered.forEach(({ block, handler }) => {
-          handler.algebraic(ctx, block);
+    if (run.needsAlgebraicSolve) {
+      if (!run.hasLabelResolution && !run.algebraicPlan.hasCycle) {
+        run.algebraicPlan.ordered.forEach(({ block, handler }) => {
+          handler.algebraic(run.ctx, block);
         });
       } else {
       let progress = true;
@@ -183,65 +208,75 @@ export async function simulate({ state, runtimeInput, statusEl, downloadFile }) 
       while (progress && iter < maxIter) {
         iter += 1;
         progress = false;
-        if (hasLabelResolution && resolveLabelSources()) progress = true;
-        algebraicPlan.ordered.forEach(({ block, handler }) => {
-          const result = handler.algebraic(ctx, block);
+        if (run.hasLabelResolution && resolveLabelSources()) progress = true;
+        run.algebraicPlan.ordered.forEach(({ block, handler }) => {
+          const result = handler.algebraic(run.ctx, block);
           if (result?.updated) progress = true;
         });
-        if (hasLabelResolution && resolveLabelSources()) progress = true;
+        if (run.hasLabelResolution && resolveLabelSources()) progress = true;
       }
       if (progress && iter >= maxIter) {
-        algebraicLoopFailed = true;
-        algebraicLoopTime = t;
+        run.algebraicLoopFailed = true;
+        run.algebraicLoopTime = t;
         return false;
       }
       }
     }
 
-    afterStepBlocks.forEach(({ block, handler }) => handler.afterStep(ctx, block));
+    run.afterStepBlocks.forEach(({ block, handler }) => handler.afterStep(run.ctx, block));
 
-    updateBlocks.forEach(({ block, handler }) => handler.update(ctx, block));
-    return !algebraicLoopFailed;
+    run.updateBlocks.forEach(({ block, handler }) => handler.update(run.ctx, block));
+    return !run.algebraicLoopFailed;
   };
 
   if (canProgressiveRun) {
-    let i = 0;
-    while (i <= samples) {
-      const end = Math.min(samples, i + chunkSize - 1);
+    let i = run.nextStep;
+    while (i <= run.samples) {
+      const end = Math.min(run.samples, i + chunkSize - 1);
       for (; i <= end; i += 1) {
         if (!runStep(i)) break;
       }
+      run.nextStep = i;
 
-      scopes.forEach((scope) => {
-        const state = blockState.get(scope.id);
+      run.scopes.forEach((scope) => {
+        const state = run.blockState.get(scope.id);
         if (!state?.scopeSeries) return;
-        drawScope(scope, time, state.scopeSeries, state.scopeConnected || []);
+        drawScope(scope, run.time, state.scopeSeries, state.scopeConnected || []);
       });
-      xyScopes.forEach((scope) => {
-        const state = blockState.get(scope.id);
+      run.xyScopes.forEach((scope) => {
+        const state = run.blockState.get(scope.id);
         if (!state?.xySeries) return;
         drawXYScope(scope, state.xySeries, state.xyConnected || []);
       });
 
-      if (algebraicLoopFailed) break;
-      const doneRatio = samples <= 0 ? 1 : Math.min(1, i / (samples + 1));
+      if (run.algebraicLoopFailed) break;
+      if (control?.pauseRequested === true) {
+        statusEl.textContent = "Paused";
+        return { status: "paused", session: run };
+      }
+      const doneRatio = run.samples <= 0 ? 1 : Math.min(1, i / (run.samples + 1));
       statusEl.textContent = `Running... ${Math.round(doneRatio * 100)}%`;
       await new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
     }
   } else {
-    for (let i = 0; i <= samples; i += 1) {
+    for (let i = run.nextStep; i <= run.samples; i += 1) {
       if (!runStep(i)) break;
+      run.nextStep = i + 1;
+      if (control?.pauseRequested === true) {
+        statusEl.textContent = "Paused";
+        return { status: "paused", session: run };
+      }
     }
   }
 
-  if (algebraicLoopFailed) {
-    statusEl.textContent = `Error: algebraic loop did not converge at t=${algebraicLoopTime.toFixed(6)} s`;
-    return;
+  if (run.algebraicLoopFailed) {
+    statusEl.textContent = `Error: algebraic loop did not converge at t=${run.algebraicLoopTime.toFixed(6)} s`;
+    return { status: "error", reason: "algebraic_loop", session: null };
   }
 
-  finalizeBlocks.forEach(({ block, handler }) => handler.finalize(ctx, block));
+  run.finalizeBlocks.forEach(({ block, handler }) => handler.finalize(run.ctx, block));
 
-  blocks.forEach((block) => {
+  run.blockHandlers.forEach(({ block }) => {
     if (block.type !== "fileSink") return;
     const csv = block.params?.lastCsv;
     if (!csv || typeof downloadFile !== "function") return;
@@ -249,18 +284,19 @@ export async function simulate({ state, runtimeInput, statusEl, downloadFile }) 
     downloadFile(name, csv, { immediate: true });
   });
 
-  scopes.forEach((scope) => {
-    const state = blockState.get(scope.id);
+  run.scopes.forEach((scope) => {
+    const state = run.blockState.get(scope.id);
     if (!state?.scopeSeries) return;
-    drawScope(scope, time, state.scopeSeries, state.scopeConnected || []);
+    drawScope(scope, run.time, state.scopeSeries, state.scopeConnected || []);
   });
-  xyScopes.forEach((scope) => {
-    const state = blockState.get(scope.id);
+  run.xyScopes.forEach((scope) => {
+    const state = run.blockState.get(scope.id);
     if (!state?.xySeries) return;
     drawXYScope(scope, state.xySeries, state.xyConnected || []);
   });
 
   statusEl.textContent = "Done";
+  return { status: "done", session: null };
 }
 
 export function drawScope(scopeBlock, time, series, connected) {
