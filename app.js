@@ -617,6 +617,54 @@ function sanitizeFilename(name) {
   return base.replace(/[^a-zA-Z0-9_-]+/g, "_");
 }
 
+const printSvgAsPdf = async (svgEl, filename) => {
+  if (!svgEl) return;
+  const clone = svgEl.cloneNode(true);
+  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  clone.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+  const viewBoxAttr = clone.getAttribute("viewBox");
+  const vb = viewBoxAttr ? viewBoxAttr.split(/\s+/).map((v) => Number(v)) : [];
+  const vbWidth = Number.isFinite(vb[2]) && vb[2] > 0 ? vb[2] : (svgEl.clientWidth || 1024);
+  const vbHeight = Number.isFinite(vb[3]) && vb[3] > 0 ? vb[3] : (svgEl.clientHeight || 768);
+  clone.setAttribute("width", String(vbWidth));
+  clone.setAttribute("height", String(vbHeight));
+  const serialized = new XMLSerializer().serializeToString(clone);
+  const printWindow = window.open("", "_blank", "width=1200,height=900");
+  if (!printWindow) throw new Error("Popup blocked");
+  const styleHref = new URL("style.css", window.location.href).href;
+  const katexHref = new URL("assets/katex/katex.min.css", window.location.href).href;
+  const title = String(filename || "vibesim.pdf").replace(/\.pdf$/i, "");
+  printWindow.document.open();
+  printWindow.document.write(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${title}</title>
+  <link rel="stylesheet" href="${styleHref}">
+  <link rel="stylesheet" href="${katexHref}">
+  <style>
+    html, body { margin: 0; background: #fff; }
+    .page { width: 100vw; height: 100vh; display: grid; place-items: center; }
+    .page svg { width: 100%; height: 100%; }
+    @page { size: auto; margin: 8mm; }
+  </style>
+</head>
+<body>
+  <div class="page">${serialized}</div>
+</body>
+</html>`);
+  printWindow.document.close();
+  await new Promise((resolve) => {
+    const done = () => resolve();
+    if (printWindow.document.readyState === "complete") done();
+    else printWindow.addEventListener("load", done, { once: true });
+  });
+  setTimeout(() => {
+    printWindow.focus();
+    printWindow.print();
+  }, 80);
+};
+
 function sanitizeParamsForSave(params) {
   if (!params || typeof params !== "object") return params || {};
   const cleaned = { ...params };
@@ -1919,7 +1967,15 @@ function init() {
     });
   }
   if (printBtn) {
-    printBtn.remove();
+    printBtn.addEventListener("click", async () => {
+      try {
+        const name = `${sanitizeFilename(state.diagramName || "vibesim")}.pdf`;
+        await printSvgAsPdf(svg, name);
+        statusEl.textContent = "Print dialog opened (choose Save as PDF)";
+      } catch (error) {
+        statusEl.textContent = `PDF export failed: ${error?.message || error}`;
+      }
+    });
   }
 
   svg.addEventListener(
